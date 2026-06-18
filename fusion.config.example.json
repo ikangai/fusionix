@@ -1,0 +1,23 @@
+{
+  "$comment": "Example deployment override. Copy to fusion.config.json (or point FUSION_CONFIG at it). It deep-merges over packages/core/config/default.config.json: top-level fields replace, presets merge by key. Verify slugs against GET {gateway}/models before deploying.",
+  "gateway": "https://openrouter.ai/api/v1",
+  "defaultPreset": "general-high",
+  "presets": {
+    "general-high": {
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "openai/gpt-5.2"
+    },
+    "municipal-fact-check": {
+      "name": "municipal-fact-check",
+      "description": "Cross-check municipal/administrative claims against multiple models with web grounding.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "anthropic/claude-opus-4.8",
+      "web": true,
+      "temperature": 0.2,
+      "panelSystem": "You are a fact-checker for municipal/administrative questions. Cite primary sources (statutes, official portals). Separate verified facts from inference and flag anything you cannot source.",
+      "writerSystem": "Write a sourced, cautious answer. Preserve citations and state clearly where the law or guidance is unsettled."
+    }
+  }
+}
