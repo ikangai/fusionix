@@ -38,7 +38,7 @@ The hosted API, authentication and key storage, the SDK, the Claude skill, and t
 ```bash
 npm install        # links workspaces, installs dev deps
 npm run build      # tsc -b → dist/ + .d.ts for both packages
-npm test           # 150 unit tests, mocked gateway, no network
+npm test           # full unit-test suite, mocked gateway, no network
 ```
 
 Make the `fusion` command available on your PATH:

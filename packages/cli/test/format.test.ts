@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderMarkdown, renderText, renderJson } from "../src/format.ts";
+import { renderMarkdown, renderText, renderJson, renderExtras } from "../src/format.ts";
 import type { FusionRunResult } from "@ikangai/fusion-core";
 
 function result(overrides: Partial<FusionRunResult> = {}): FusionRunResult {
@@ -60,6 +60,19 @@ test("renderText includes the answer and footer without markdown headers", () =>
   assert.match(txt, /The answer is 42\./);
   assert.match(txt, /cost: \$0\.1234/);
   assert.doesNotMatch(txt, /^#/m);
+});
+
+test("renderExtras emits analysis (when requested) + footer WITHOUT the answer", () => {
+  const md = renderExtras(result(), { showAnalysis: true }, "md");
+  assert.doesNotMatch(md, /The answer is 42/); // streamed answer not repeated
+  assert.match(md, /Judge analysis/);
+  assert.match(md, /both agree/);
+  assert.match(md, /cost: \$0\.1234/);
+
+  const txt = renderExtras(result(), { showAnalysis: false }, "text");
+  assert.doesNotMatch(txt, /Judge analysis/);
+  assert.match(txt, /cost: \$0\.1234/);
+  assert.doesNotMatch(txt, /The answer is 42/);
 });
 
 test("cost null renders as n/a; bypass result shows single-model footer", () => {

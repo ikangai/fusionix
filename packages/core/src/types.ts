@@ -108,6 +108,7 @@ export interface ExecutionPlan {
   panelSystem?: string;
   judgeSystem?: string;
   writerSystem?: string;
+  /** Resolved preset name; carried for Phase-2 run logging (§16). */
   presetName?: string;
   /** Caller messages, role-folded (developer→system) but otherwise preserved. */
   messages: ChatMessage[];

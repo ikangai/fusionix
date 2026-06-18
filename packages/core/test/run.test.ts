@@ -119,6 +119,55 @@ test("single-model bypass (enabled:false): answer only, no panel/analysis, web o
   assert.equal(calls[0]!.model, "openai/gpt-z");
 });
 
+test("streaming bypass forwards deltas, accumulates the answer, and uses :online when web is on", async () => {
+  const requested: string[] = [];
+  const gateway: ChatGateway = {
+    async chat() {
+      return { content: "should not be used" };
+    },
+    async *streamChat(req) {
+      requested.push(req.model);
+      yield "Sin";
+      yield "gle";
+      return { content: "Single" };
+    },
+  };
+  const deltas: string[] = [];
+  const result = await runFusion(
+    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+    { config: makeConfig(), gateway, apiKey: "x", onWriterDelta: (d) => deltas.push(d) },
+  );
+  assert.deepEqual(deltas, ["Sin", "gle"]);
+  assert.equal(result.answer, "Single");
+  assert.equal(result.panel, undefined);
+  assert.equal(result.web, "used");
+  assert.equal(requested[0], "openai/gpt-z:online");
+});
+
+test("non-streaming bypass with web: :online success → web 'used'", async () => {
+  const { gateway } = makeGateway(() => ({ content: "ANS", usage: usage(2, 2, 0.4) }));
+  const result = await runFusion(
+    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+    { config: makeConfig(), gateway, apiKey: "x" },
+  );
+  assert.equal(result.web, "used");
+  assert.equal(result.answer, "ANS");
+  assert.equal(result.costUsd, 0.4);
+});
+
+test("non-streaming bypass with web: :online fails then no-web retry succeeds → web 'unsupported'", async () => {
+  const { gateway } = makeGateway((req) => {
+    if (req.model.endsWith(":online")) throw new Error("web routing down");
+    return { content: "ANS" };
+  });
+  const result = await runFusion(
+    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+    { config: makeConfig(), gateway, apiKey: "x" },
+  );
+  assert.equal(result.web, "unsupported");
+  assert.equal(result.answer, "ANS");
+});
+
 test("invalid request is rejected before any gateway call", async () => {
   const { gateway, calls } = makeGateway(() => ({ content: "x" }));
   await assert.rejects(
@@ -140,7 +189,10 @@ test("web off when the plan disables web", async () => {
   assert.ok(calls.filter((c) => c.model.includes(":online")).length === 0);
 });
 
-test("timeout with ≥1 survivor proceeds to judge; final answer returned", async () => {
+test("deadline during panel: ≥1 survivor avoids all_panel_failed, but judge fails under the hard cap (§17)", async () => {
+  // Realistic gateway: a call started after the deadline sees the already-aborted
+  // shared signal and rejects (mirrors fetch). So a panel-deadline yields
+  // judge_failed (survivors retained → not all_panel_failed), honoring the hard cap.
   const { gateway } = makeGateway((req, opts) => {
     if (req.model.startsWith("SLOW")) {
       return new Promise<GatewayCallResult>((_resolve, reject) => {
@@ -148,19 +200,16 @@ test("timeout with ≥1 survivor proceeds to judge; final answer returned", asyn
         opts?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
       });
     }
+    if (opts?.signal?.aborted) return Promise.reject(new Error("aborted"));
     if (req.model.startsWith("J")) return Promise.resolve({ content: VALID_ANALYSIS });
     if (req.model.startsWith("W")) return Promise.resolve({ content: "FINAL" });
     return Promise.resolve({ content: JSON.stringify({ answer: "fast" }) });
   });
-  const result = await runFusion(userReq, {
-    config: makeConfig(["FAST", "SLOW"]),
-    gateway,
-    apiKey: "x",
-    maxRequestDurationMs: 30,
-  });
-  assert.equal(result.answer, "FINAL");
-  assert.equal(result.panel?.[0]?.answer, "fast");
-  assert.ok(result.panel?.[1]?.error, "slow member aborted at deadline");
+  await assert.rejects(
+    () =>
+      runFusion(userReq, { config: makeConfig(["FAST", "SLOW"]), gateway, apiKey: "x", maxRequestDurationMs: 30 }),
+    (err: unknown) => isFusionError(err) && err.code === "judge_failed",
+  );
 });
 
 test("web 'unsupported' when web is requested but every member falls back from :online", async () => {

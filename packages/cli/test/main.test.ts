@@ -148,6 +148,31 @@ test("--stream streams writer deltas to stdout", async () => {
   assert.match(h.out(), /cost: \$0\.1200/); // extras footer still printed
 });
 
+test("--stream --show-analysis streams the answer, then prints analysis and footer in order", async () => {
+  const h = harness({
+    runFusion: async (_req: FusionChatCompletionRequest, opts: RunFusionOptions) => {
+      opts.onWriterDelta?.("Hel");
+      opts.onWriterDelta?.("lo");
+      return sampleResult({ answer: "Hello" });
+    },
+  });
+  const code = await main(["q", "--local", "--stream", "--show-analysis"], h.deps);
+  assert.equal(code, 0);
+  const out = h.out();
+  assert.match(out, /Hello/);
+  assert.match(out, /Judge analysis/);
+  assert.match(out, /cost: \$0\.1200/);
+  assert.ok(out.indexOf("Hello") < out.indexOf("Judge analysis"), "answer streamed before analysis");
+});
+
+test("--stream falls back to a full render when no deltas are emitted", async () => {
+  const h = harness({ runFusion: async () => sampleResult() }); // never calls onWriterDelta
+  const code = await main(["q", "--local", "--stream"], h.deps);
+  assert.equal(code, 0);
+  assert.match(h.out(), /The answer is 42\./); // full answer still printed
+  assert.match(h.out(), /cost: \$0\.1200/);
+});
+
 test("--no-web sets webOverride false in run options", async () => {
   const h = harness();
   await main(["q", "--local", "--no-web"], h.deps);

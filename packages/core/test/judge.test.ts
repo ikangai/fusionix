@@ -87,6 +87,13 @@ test("repairs once when the first output is not JSON", async () => {
   assert.equal(calls[1]!.req.model, "J", "repair uses the same judge model");
 });
 
+test("repairs when the first output parses as a non-object (JSON array)", async () => {
+  const { gateway, calls } = sequencedGateway([() => ({ content: "[1, 2, 3]" }), () => ({ content: VALID })]);
+  const { analysis } = await runJudge(makePlan(), "q", panel, { gateway });
+  assert.deepEqual(analysis.consensus, ["c1"]);
+  assert.equal(calls.length, 2, "array is not an object → one repair");
+});
+
 test("throws judge_failed when JSON is missing after one repair", async () => {
   const { gateway, calls } = sequencedGateway([() => ({ content: "no json ever" })]);
   await assert.rejects(

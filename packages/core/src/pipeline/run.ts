@@ -140,6 +140,11 @@ export async function runFusion(
 
     opts.onProgress?.("panel");
     const { responses, calls: panelCalls, webUsed } = await runPanel(plan, deps);
+    // §17: panel members that completed before the deadline keep their results
+    // (their promises already settled); only in-flight ones abort. With ≥1
+    // survivor we proceed to judge. maxRequestDurationMs is a HARD cap, so if the
+    // deadline already fired the shared signal, the judge/writer calls abort and
+    // surface as judge_failed/writer_failed — distinct from all_panel_failed here.
     const successes = responses.filter((r) => r.error === undefined && r.answer !== undefined);
     if (successes.length === 0) {
       throw new FusionError("all_panel_failed", "All panel models failed.", { runId: plan.runId });
