@@ -99,6 +99,19 @@ test("listPresetsRedacted redacts every preset", async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test("a brand-new partial preset is created with empty judge/writer (no base to merge)", async () => {
+  // Documents the merge-vs-create asymmetry: deep-merge only applies to existing
+  // keys; a new partial preset gets empty judge/writer and fails later at use.
+  const dir = await emptyDir();
+  const file = join(dir, "fusion.config.json");
+  await writeFile(file, JSON.stringify({ presets: { partial: { panel: ["x"] } } }));
+  const cfg = await loadConfig({ configPath: file, env: {}, cwd: dir });
+  assert.deepEqual(cfg.presets["partial"]!.panel, ["x"]);
+  assert.equal(cfg.presets["partial"]!.judge, "");
+  assert.equal(cfg.presets["partial"]!.writer, "");
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("throws fast when defaultPreset points at a missing preset", async () => {
   const dir = await emptyDir();
   await assert.rejects(() => loadConfig({ env: { FUSION_DEFAULT_PRESET: "does-not-exist" }, cwd: dir }));

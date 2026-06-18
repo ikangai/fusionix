@@ -227,8 +227,14 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
 
   if (args.log) {
     try {
-      const data = JSON.stringify(toChatCompletion(result)) + "\n";
-      await (deps.writeFile ?? writeFile)(args.log, data);
+      // Run record (§16): the OpenAI-shaped result plus a timestamp and the
+      // requested preset. (Fuller per-stage logging is a Phase-2 concern.)
+      const record = {
+        logged_at: new Date(result.created * 1000).toISOString(),
+        preset: args.preset ?? null,
+        ...toChatCompletion(result),
+      };
+      await (deps.writeFile ?? writeFile)(args.log, JSON.stringify(record) + "\n");
     } catch (e) {
       stderr(`fusion: could not write log to ${args.log}: ${errMessage(e)}\n`);
     }

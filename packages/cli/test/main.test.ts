@@ -128,10 +128,13 @@ test("a FusionError from runFusion → exit 1 with message and code", async () =
 test("--log writes the run record", async () => {
   let written: { path: string; data: string } | undefined;
   const h = harness({ writeFile: async (path: string, data: string) => void (written = { path, data }) });
-  const code = await main(["q", "--local", "--log", "run.jsonl"], h.deps);
+  const code = await main(["q", "--local", "--preset", "general-high", "--log", "run.jsonl"], h.deps);
   assert.equal(code, 0);
   assert.equal(written?.path, "run.jsonl");
-  assert.match(written!.data, /chat\.completion/);
+  const record = JSON.parse(written!.data);
+  assert.equal(record.object, "chat.completion");
+  assert.equal(record.preset, "general-high");
+  assert.ok(typeof record.logged_at === "string");
 });
 
 test("--stream streams writer deltas to stdout", async () => {
