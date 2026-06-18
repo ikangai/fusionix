@@ -1,0 +1,25 @@
+{
+  "name": "fusion-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fusion — OpenRouter-shaped multi-model deliberation engine (monorepo root)",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "typecheck": "tsc -b",
+    "test": "node --conditions=development --test \"packages/*/test/**/*.test.ts\"",
+    "test:core": "node --conditions=development --test \"packages/core/test/**/*.test.ts\"",
+    "test:cli": "node --conditions=development --test \"packages/cli/test/**/*.test.ts\"",
+    "fusion": "node --conditions=development packages/cli/src/index.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

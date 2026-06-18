@@ -1,0 +1,22 @@
+{
+  "name": "@ikangai/fusion-cli",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Fusion CLI — run multi-model deliberation from the terminal (hosted or --local).",
+  "bin": {
+    "fusion": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@ikangai/fusion-core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "test": "node --conditions=development --test \"test/**/*.test.ts\""
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "$comment": "Fusion deployment defaults. Slugs are DATA, not core logic (spec §4). Verify against GET {gateway}/models before deploy; model IDs drift. Verified against openrouter.ai/api/v1/models on 2026-06-18.",
+  "gateway": "https://openrouter.ai/api/v1",
+  "defaultPreset": "general-high",
+  "defaults": {
+    "maxToolCalls": 8,
+    "web": true
+  },
+  "presets": {
+    "general-high": {
+      "name": "general-high",
+      "description": "High-quality general deliberation across three frontier models with a strong judge and writer.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "openai/gpt-5.2",
+      "web": true,
+      "temperature": 0.5
+    },
+    "general-budget": {
+      "name": "general-budget",
+      "description": "Low-cost general deliberation using fast, inexpensive models.",
+      "panel": ["anthropic/claude-haiku-4.5", "openai/gpt-5-mini", "google/gemini-2.5-flash"],
+      "judge": "openai/gpt-5-mini",
+      "writer": "openai/gpt-5-mini",
+      "web": true,
+      "temperature": 0.5
+    },
+    "research-high": {
+      "name": "research-high",
+      "description": "Web-grounded research with a frontier panel and a careful synthesis writer; favors cited, hedged claims.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "anthropic/claude-opus-4.8",
+      "web": true,
+      "temperature": 0.4,
+      "panelSystem": "You are a research analyst. Prefer primary sources, cite them in the citations array, and clearly separate established facts from inference. State confidence and note where evidence is thin or contested.",
+      "judgeSystem": "Weigh claims by evidence quality, not assertiveness. Flag any claim that lacks a citation as a blind spot. Surface contradictions between sources explicitly.",
+      "writerSystem": "Write a rigorous, well-sourced answer. Preserve citations. Distinguish consensus from contested points, and state remaining uncertainty plainly."
+    },
+    "research-budget": {
+      "name": "research-budget",
+      "description": "Low-cost web-grounded research using fast models.",
+      "panel": ["anthropic/claude-haiku-4.5", "openai/gpt-5-mini", "google/gemini-2.5-flash"],
+      "judge": "openai/gpt-5-mini",
+      "writer": "openai/gpt-5-mini",
+      "web": true,
+      "temperature": 0.4,
+      "panelSystem": "You are a research analyst. Prefer primary sources, cite them, and separate facts from inference. Note where evidence is thin.",
+      "writerSystem": "Write a well-sourced answer. Preserve citations and state remaining uncertainty plainly."
+    },
+    "code-review": {
+      "name": "code-review",
+      "description": "Review code for correctness bugs, security issues, edge cases, and maintainability across a multi-model panel.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2-codex", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "anthropic/claude-opus-4.8",
+      "web": false,
+      "temperature": 0.2,
+      "panelSystem": "You are a senior software engineer reviewing code. Identify correctness bugs, security vulnerabilities, race conditions, resource leaks, and edge cases. Be concrete: name the file/function and the failure mode. Put risky assumptions in assumptions and concrete hazards in risks.",
+      "judgeSystem": "Compare the reviews. Prioritize correctness and security findings. Treat a bug found by only one reviewer as a unique insight, not noise. Rank reviews by the severity and correctness of what they caught.",
+      "writerSystem": "Write the consolidated review. Lead with the most severe, highest-confidence issues. Give actionable fixes. Group by severity. Do not invent issues not supported by the analysis."
+    },
+    "architecture-review": {
+      "name": "architecture-review",
+      "description": "Review technical architecture for correctness, risk, tradeoffs, and missing pieces.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "anthropic/claude-opus-4.8",
+      "web": false,
+      "temperature": 0.3,
+      "panelSystem": "You are a principal architect reviewing a system design. Evaluate correctness, scalability, failure modes, operational risk, security boundaries, and cost. Call out unstated assumptions and missing pieces. Put assumptions in assumptions and concrete risks in risks.",
+      "judgeSystem": "Compare the architecture reviews. Distinguish genuine disagreements about tradeoffs from differences in emphasis. Highlight risks raised by only one reviewer as unique insights, and gaps none covered as blind spots.",
+      "writerSystem": "Write the consolidated architecture review. Lead with the verdict and the highest-impact risks and tradeoffs. Be specific about what to change and why. Note open questions the team must resolve."
+    }
+  }
+}

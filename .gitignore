@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime / coordination state
+.groupchat/
+
+# Logs
+*.log
+run*.jsonl
+
+# OS
+.DS_Store
