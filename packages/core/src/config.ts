@@ -1,0 +1,164 @@
+/**
+ * Configuration loading and preset redaction.
+ *
+ * Model slugs are DATA (spec §4): they live in `config/default.config.json`,
+ * not in core logic. Resolution order: bundled default → external file
+ * (explicit path, `FUSION_CONFIG`, or `<cwd>/fusion.config.json`) → env
+ * overrides (`FUSION_DEFAULT_GATEWAY`, `FUSION_DEFAULT_PRESET`).
+ */
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { FusionConfig, ResolvedPreset, RedactedPreset } from "./types.ts";
+import { FusionError } from "./errors.ts";
+
+interface RawPreset {
+  name?: string;
+  description?: string;
+  panel?: string[];
+  judge?: string;
+  writer?: string;
+  web?: boolean;
+  temperature?: number;
+  maxTokens?: number;
+  panelSystem?: string;
+  judgeSystem?: string;
+  writerSystem?: string;
+}
+
+interface RawConfig {
+  gateway?: string;
+  defaultPreset?: string;
+  defaults?: { maxToolCalls?: number; web?: boolean };
+  presets?: Record<string, RawPreset>;
+}
+
+export interface LoadConfigOptions {
+  /** Explicit config file path; if set and missing, loadConfig throws. */
+  configPath?: string;
+  /** Environment map (defaults to process.env). */
+  env?: Record<string, string | undefined>;
+  /** Working directory for auto-discovery of fusion.config.json (defaults to process.cwd()). */
+  cwd?: string;
+}
+
+const DEFAULT_CONFIG_URL = new URL("../config/default.config.json", import.meta.url);
+
+function toPreset(key: string, raw: RawPreset): ResolvedPreset {
+  const preset: ResolvedPreset = {
+    name: raw.name ?? key,
+    description: raw.description ?? "",
+    panel: raw.panel ?? [],
+    judge: raw.judge ?? "",
+    writer: raw.writer ?? "",
+    web: raw.web ?? true,
+  };
+  if (raw.temperature !== undefined) preset.temperature = raw.temperature;
+  if (raw.maxTokens !== undefined) preset.maxTokens = raw.maxTokens;
+  if (raw.panelSystem) preset.panelSystem = raw.panelSystem;
+  if (raw.judgeSystem) preset.judgeSystem = raw.judgeSystem;
+  if (raw.writerSystem) preset.writerSystem = raw.writerSystem;
+  return preset;
+}
+
+function normalizeConfig(raw: RawConfig): FusionConfig {
+  const presets: Record<string, ResolvedPreset> = {};
+  for (const [key, value] of Object.entries(raw.presets ?? {})) {
+    presets[key] = toPreset(key, value);
+  }
+  const config: FusionConfig = {
+    gateway: raw.gateway ?? "https://openrouter.ai/api/v1",
+    defaults: {
+      maxToolCalls: raw.defaults?.maxToolCalls ?? 8,
+      web: raw.defaults?.web ?? true,
+    },
+    presets,
+  };
+  if (raw.defaultPreset !== undefined) config.defaultPreset = raw.defaultPreset;
+  return config;
+}
+
+/** Deep-merge an external raw config over an already-normalized config. */
+function mergeExternal(base: FusionConfig, raw: RawConfig): FusionConfig {
+  const merged: FusionConfig = {
+    gateway: raw.gateway ?? base.gateway,
+    defaults: {
+      maxToolCalls: raw.defaults?.maxToolCalls ?? base.defaults.maxToolCalls,
+      web: raw.defaults?.web ?? base.defaults.web,
+    },
+    presets: { ...base.presets },
+  };
+  const defaultPreset = raw.defaultPreset ?? base.defaultPreset;
+  if (defaultPreset !== undefined) merged.defaultPreset = defaultPreset;
+
+  for (const [key, value] of Object.entries(raw.presets ?? {})) {
+    const existing = base.presets[key];
+    // Deep-merge per preset: external fields win, base fields preserved.
+    merged.presets[key] = existing
+      ? toPreset(key, { ...presetToRaw(existing), ...value })
+      : toPreset(key, value);
+  }
+  return merged;
+}
+
+function presetToRaw(p: ResolvedPreset): RawPreset {
+  return { ...p };
+}
+
+async function readJsonFile(path: string): Promise<RawConfig> {
+  let text: string;
+  try {
+    text = await readFile(path, "utf8");
+  } catch (cause) {
+    throw new FusionError("internal_error", `Could not read config file: ${path}`, { cause });
+  }
+  try {
+    return JSON.parse(text) as RawConfig;
+  } catch (cause) {
+    throw new FusionError("internal_error", `Config file is not valid JSON: ${path}`, { cause });
+  }
+}
+
+async function readJsonFileIfExists(path: string): Promise<RawConfig | undefined> {
+  try {
+    const text = await readFile(path, "utf8");
+    return JSON.parse(text) as RawConfig;
+  } catch {
+    return undefined;
+  }
+}
+
+export async function loadConfig(opts: LoadConfigOptions = {}): Promise<FusionConfig> {
+  const env = opts.env ?? process.env;
+  const cwd = opts.cwd ?? process.cwd();
+
+  const baseRaw = JSON.parse(await readFile(DEFAULT_CONFIG_URL, "utf8")) as RawConfig;
+  let config = normalizeConfig(baseRaw);
+
+  // External override file.
+  const explicitPath = opts.configPath ?? env.FUSION_CONFIG;
+  if (explicitPath) {
+    config = mergeExternal(config, await readJsonFile(explicitPath));
+  } else {
+    const discovered = await readJsonFileIfExists(join(cwd, "fusion.config.json"));
+    if (discovered) config = mergeExternal(config, discovered);
+  }
+
+  // Env overrides win last.
+  if (env.FUSION_DEFAULT_GATEWAY) config.gateway = env.FUSION_DEFAULT_GATEWAY;
+  if (env.FUSION_DEFAULT_PRESET) config.defaultPreset = env.FUSION_DEFAULT_PRESET;
+
+  return config;
+}
+
+export function redactPreset(p: ResolvedPreset): RedactedPreset {
+  return {
+    name: p.name,
+    description: p.description,
+    panel_size: p.panel.length,
+    web: p.web,
+  };
+}
+
+export function listPresetsRedacted(config: FusionConfig): RedactedPreset[] {
+  return Object.values(config.presets).map(redactPreset);
+}
