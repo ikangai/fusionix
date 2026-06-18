@@ -17,9 +17,21 @@ function tryParse(s: string): unknown | undefined {
   }
 }
 
+/**
+ * Strip a wrapping markdown code fence with a LINEAR scan (no regex backtracking).
+ * Only treats the input as fenced when it both opens with ``` on the first line
+ * and ends with ```; otherwise returns it unchanged. Untrusted model output of
+ * arbitrary size flows through here, so this must not be super-linear.
+ */
 function stripFence(s: string): string {
-  const m = s.match(/^```[a-zA-Z0-9_-]*\s*\n?([\s\S]*?)\n?```$/);
-  return m ? (m[1] as string) : s;
+  if (!s.startsWith("```") || !s.endsWith("```") || s.length < 6) return s;
+  const firstNewline = s.indexOf("\n");
+  if (firstNewline === -1) return s;
+  const lang = s.slice(3, firstNewline).trim();
+  // The fence info string (if any) must look like a language tag.
+  if (lang.length > 0 && !/^[a-zA-Z0-9_-]+$/.test(lang)) return s;
+  const inner = s.slice(firstNewline + 1, s.length - 3);
+  return inner.endsWith("\n") ? inner.slice(0, -1) : inner;
 }
 
 /** Scan from `start` (an opening bracket) to its matching close, honoring strings/escapes. */

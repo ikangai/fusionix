@@ -66,11 +66,23 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   if (values.panel) args.panel = splitCsv(values.panel);
   if (values.judge) args.judge = values.judge;
   if (values.writer) args.writer = values.writer;
-  if (values["max-tool-calls"] !== undefined) args.maxToolCalls = Number(values["max-tool-calls"]);
+  if (values["max-tool-calls"] !== undefined) {
+    const n = Number(values["max-tool-calls"]);
+    if (!Number.isInteger(n) || n <= 0) {
+      throw new Error(`invalid --max-tool-calls '${values["max-tool-calls"]}' (expected a positive integer)`);
+    }
+    args.maxToolCalls = n;
+  }
   if (values.format) args.format = values.format as OutputFormat;
   if (values["api-url"]) args.apiUrl = values["api-url"];
   if (values.log) args.log = values.log;
-  if (values["max-cost"] !== undefined) args.maxCost = Number(values["max-cost"]);
+  if (values["max-cost"] !== undefined) {
+    const n = Number(values["max-cost"]);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(`invalid --max-cost '${values["max-cost"]}' (expected a positive number)`);
+    }
+    args.maxCost = n;
+  }
 
   return args;
 }

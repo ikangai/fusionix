@@ -58,3 +58,18 @@ test("prefers the earliest of object/array when both present", () => {
   const arrFirst = 'note [2] and {"k":1}';
   assert.deepEqual(extractJson(arrFirst), [2]);
 });
+
+test("parses a JSON array inside a fenced block", () => {
+  assert.deepEqual(extractJson("```json\n[1, 2, 3]\n```"), [1, 2, 3]);
+});
+
+test("returns quickly (no ReDoS) for a large unterminated fence", () => {
+  // A fence that opens but never validly closes, with many newlines. The old
+  // lazy-regex stripper backtracked quadratically here; this must stay linear.
+  const big = "```\n" + "\n".repeat(200000) + "x";
+  const start = process.hrtime.bigint();
+  const result = extractJson(big);
+  const ms = Number(process.hrtime.bigint() - start) / 1e6;
+  assert.equal(result, undefined);
+  assert.ok(ms < 500, `extractJson took ${ms.toFixed(0)}ms (possible ReDoS)`);
+});

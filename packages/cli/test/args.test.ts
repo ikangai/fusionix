@@ -61,3 +61,16 @@ test("parses --version and --help", () => {
   assert.equal(parseCliArgs(["--version"]).version, true);
   assert.equal(parseCliArgs(["--help"]).help, true);
 });
+
+test("rejects a non-numeric --max-cost instead of silently disabling the cap", () => {
+  assert.throws(() => parseCliArgs(["q", "--max-cost", "0.5x"]), /max-cost/);
+});
+
+test("rejects a negative or zero --max-cost", () => {
+  assert.throws(() => parseCliArgs(["q", "--max-cost", "-5"]), /max-cost/);
+  assert.throws(() => parseCliArgs(["q", "--max-cost", "0"]), /max-cost/);
+});
+
+test("rejects a non-numeric --max-tool-calls", () => {
+  assert.throws(() => parseCliArgs(["q", "--max-tool-calls", "abc"]), /max-tool-calls/);
+});
