@@ -102,6 +102,8 @@ export interface ExecutionPlan {
   panelTemperature?: number;
   judgeTemperature?: number;
   writerTemperature?: number;
+  panelMaxTokens?: number;
+  judgeMaxTokens?: number;
   writerMaxTokens?: number;
   panelSystem?: string;
   judgeSystem?: string;

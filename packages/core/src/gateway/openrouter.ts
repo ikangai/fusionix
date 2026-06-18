@@ -32,6 +32,11 @@ export interface ChatCallOptions {
   signal?: AbortSignal;
 }
 
+/** Minimal gateway surface the pipeline stages depend on (lets tests inject fakes). */
+export interface ChatGateway {
+  chat(req: ChatRequest, opts?: ChatCallOptions): Promise<GatewayCallResult>;
+}
+
 export interface GatewayModel {
   id: string;
   pricing?: { prompt?: string; completion?: string };

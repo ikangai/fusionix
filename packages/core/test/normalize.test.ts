@@ -18,6 +18,7 @@ const config: FusionConfig = {
       writer: "RW",
       web: true,
       temperature: 0.4,
+      maxTokens: 2048,
       panelSystem: "PS",
       judgeSystem: "JS",
       writerSystem: "WS",
@@ -144,6 +145,26 @@ test("request temperature/max_tokens apply to the writer only", () => {
   assert.equal(plan.writerMaxTokens, 1000);
   assert.equal(plan.panelTemperature, 0.5); // preset default, not overridden
   assert.equal(plan.judgeTemperature, 0.5);
+});
+
+test("preset maxTokens applies to panel/judge; request max_tokens overrides writer only", () => {
+  const plan = normalizeRequest(
+    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "research-high" }] }),
+    config,
+    RID,
+  );
+  assert.equal(plan.panelMaxTokens, 2048);
+  assert.equal(plan.judgeMaxTokens, 2048);
+  assert.equal(plan.writerMaxTokens, 2048);
+
+  const overridden = normalizeRequest(
+    req({ model: "fusion", messages: [user], max_tokens: 500, plugins: [{ id: "fusion", preset: "research-high" }] }),
+    config,
+    RID,
+  );
+  assert.equal(overridden.writerMaxTokens, 500);
+  assert.equal(overridden.panelMaxTokens, 2048); // unchanged
+  assert.equal(overridden.judgeMaxTokens, 2048);
 });
 
 test("plugin.max_tool_calls overrides the default", () => {

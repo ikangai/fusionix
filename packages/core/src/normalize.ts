@@ -116,6 +116,10 @@ export function normalizeRequest(
   }
   const writerTemperature = request.temperature ?? preset?.temperature;
   if (writerTemperature !== undefined) plan.writerTemperature = writerTemperature;
+  if (preset?.maxTokens !== undefined) {
+    plan.panelMaxTokens = preset.maxTokens;
+    plan.judgeMaxTokens = preset.maxTokens;
+  }
   const writerMaxTokens = request.max_tokens ?? preset?.maxTokens;
   if (writerMaxTokens !== undefined) plan.writerMaxTokens = writerMaxTokens;
   if (preset?.panelSystem) plan.panelSystem = preset.panelSystem;

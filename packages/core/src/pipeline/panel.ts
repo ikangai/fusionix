@@ -1,0 +1,98 @@
+/**
+ * Panel stage (spec §6.3, §14.1, §17).
+ *
+ * Sends the same prompt to every panel model in parallel. One failure does not
+ * fail the run: failed members stay in their resolved position as
+ * `{ model, error }`. Panel JSON that fails to parse keeps the raw text as
+ * `answer` — there is NO repair call in v1 (§14.1).
+ */
+import { applyWeb } from "../gateway/web.ts";
+import { extractJson } from "../json.ts";
+import { prependSystem } from "../messages.ts";
+import { PANEL_SYSTEM, composeSystem } from "../prompts.ts";
+import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
+import type { Citation, ExecutionPlan, GatewayCallResult, PanelResponse } from "../types.ts";
+
+export interface PanelDeps {
+  gateway: ChatGateway;
+  signal?: AbortSignal;
+}
+
+export interface PanelOutcome {
+  /** One entry per panel model, in resolved order; failures kept in place. */
+  responses: PanelResponse[];
+  /** Successful gateway calls, for cost aggregation. */
+  calls: GatewayCallResult[];
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out = value.filter((v): v is string => typeof v === "string");
+  return out.length > 0 ? out : undefined;
+}
+
+function parseCitations(value: unknown): Citation[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const out: Citation[] = [];
+  for (const item of value) {
+    if (item && typeof item === "object" && typeof (item as { url?: unknown }).url === "string") {
+      const c = item as { url: string; title?: unknown };
+      out.push(typeof c.title === "string" ? { title: c.title, url: c.url } : { url: c.url });
+    }
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+function parsePanelContent(model: string, content: string): PanelResponse {
+  const parsed = extractJson(content);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const obj = parsed as Record<string, unknown>;
+    const response: PanelResponse = { model };
+    response.answer = typeof obj.answer === "string" ? obj.answer : content;
+    const assumptions = asStringArray(obj.assumptions);
+    if (assumptions) response.assumptions = assumptions;
+    const risks = asStringArray(obj.risks);
+    if (risks) response.risks = risks;
+    const citations = parseCitations(obj.citations);
+    if (citations) response.citations = citations;
+    return response;
+  }
+  // Parse failed — keep the raw text as the answer (§14.1, no repair).
+  return { model, answer: content };
+}
+
+export async function runPanel(plan: ExecutionPlan, deps: PanelDeps): Promise<PanelOutcome> {
+  const systemText = composeSystem(PANEL_SYSTEM, plan.panelSystem);
+  const messages = prependSystem(systemText, plan.messages);
+
+  const settled = await Promise.all(
+    plan.panel.map(async (model) => {
+      const req: ChatRequest = { model: applyWeb(model, plan.web), messages };
+      if (plan.panelTemperature !== undefined) req.temperature = plan.panelTemperature;
+      if (plan.panelMaxTokens !== undefined) req.maxTokens = plan.panelMaxTokens;
+      try {
+        const res = await deps.gateway.chat(req, deps.signal ? { signal: deps.signal } : {});
+        return { ok: true as const, model, res };
+      } catch (err) {
+        return { ok: false as const, model, err };
+      }
+    }),
+  );
+
+  const responses: PanelResponse[] = [];
+  const calls: GatewayCallResult[] = [];
+  for (const outcome of settled) {
+    if (outcome.ok) {
+      calls.push(outcome.res);
+      responses.push(parsePanelContent(outcome.model, outcome.res.content));
+    } else {
+      responses.push({ model: outcome.model, error: { message: errorMessage(outcome.err) } });
+    }
+  }
+  return { responses, calls };
+}
