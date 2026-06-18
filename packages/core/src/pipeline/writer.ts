@@ -14,11 +14,25 @@ import type { ExecutionPlan, FusionAnalysis, GatewayCallResult } from "../types.
 export interface WriterDeps {
   gateway: ChatGateway;
   signal?: AbortSignal;
+  /** When set and the gateway supports streaming, the writer streams deltas here. */
+  onDelta?: (delta: string) => void;
 }
 
 export interface WriterOutcome {
   answer: string;
   call: GatewayCallResult;
+}
+
+export async function consumeStream(
+  gen: AsyncGenerator<string, GatewayCallResult, void>,
+  onDelta: (delta: string) => void,
+): Promise<GatewayCallResult> {
+  let next = await gen.next();
+  while (!next.done) {
+    onDelta(next.value);
+    next = await gen.next();
+  }
+  return next.value;
 }
 
 export async function runWriter(
@@ -40,9 +54,14 @@ export async function runWriter(
   if (plan.writerTemperature !== undefined) req.temperature = plan.writerTemperature;
   if (plan.writerMaxTokens !== undefined) req.maxTokens = plan.writerMaxTokens;
 
+  const callOpts = deps.signal ? { signal: deps.signal } : {};
   let call: GatewayCallResult;
   try {
-    call = await deps.gateway.chat(req, deps.signal ? { signal: deps.signal } : {});
+    if (deps.onDelta && deps.gateway.streamChat) {
+      call = await consumeStream(deps.gateway.streamChat(req, callOpts), deps.onDelta);
+    } else {
+      call = await deps.gateway.chat(req, callOpts);
+    }
   } catch (cause) {
     throw new FusionError("writer_failed", "Writer call failed.", { cause, runId: plan.runId });
   }

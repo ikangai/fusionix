@@ -163,6 +163,29 @@ test("timeout with ≥1 survivor proceeds to judge; final answer returned", asyn
   assert.ok(result.panel?.[1]?.error, "slow member aborted at deadline");
 });
 
+test("onWriterDelta streams the final answer when the gateway supports it", async () => {
+  const gateway: ChatGateway = {
+    async chat(req) {
+      if (req.model.startsWith("J")) return { content: VALID_ANALYSIS };
+      return { content: JSON.stringify({ answer: "ok" }) }; // panel
+    },
+    async *streamChat() {
+      yield "Fin";
+      yield "al";
+      return { content: "Final" };
+    },
+  };
+  const deltas: string[] = [];
+  const result = await runFusion(userReq, {
+    config: makeConfig(),
+    gateway,
+    apiKey: "x",
+    onWriterDelta: (d) => deltas.push(d),
+  });
+  assert.deepEqual(deltas, ["Fin", "al"]);
+  assert.equal(result.answer, "Final");
+});
+
 test("timeout with zero survivors → all_panel_failed", async () => {
   const { gateway } = makeGateway((req, opts) => {
     if (req.model.startsWith("SLOW")) {

@@ -86,3 +86,44 @@ test("a thrown writer call → writer_failed", async () => {
     (err: unknown) => isFusionError(err) && err.code === "writer_failed",
   );
 });
+
+test("streams writer deltas via onDelta when streamChat is available", async () => {
+  let streamCalled = false;
+  let chatCalled = false;
+  const gateway: ChatGateway = {
+    async chat() {
+      chatCalled = true;
+      return { content: "non-stream" };
+    },
+    async *streamChat() {
+      streamCalled = true;
+      yield "Fin";
+      yield "al";
+      return { content: "Final", usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, cost: 0.01 } };
+    },
+  };
+  const deltas: string[] = [];
+  const { answer, call } = await runWriter(makePlan(), "q", analysis, { gateway, onDelta: (d) => deltas.push(d) });
+  assert.equal(streamCalled, true);
+  assert.equal(chatCalled, false);
+  assert.deepEqual(deltas, ["Fin", "al"]);
+  assert.equal(answer, "Final");
+  assert.equal(call.usage?.cost, 0.01);
+});
+
+test("falls back to non-streaming chat when onDelta is not provided", async () => {
+  let chatCalled = false;
+  const gateway: ChatGateway = {
+    async chat() {
+      chatCalled = true;
+      return { content: "non-stream" };
+    },
+    async *streamChat() {
+      yield "x";
+      return { content: "x" };
+    },
+  };
+  const { answer } = await runWriter(makePlan(), "q", analysis, { gateway });
+  assert.equal(chatCalled, true);
+  assert.equal(answer, "non-stream");
+});

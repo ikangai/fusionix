@@ -35,6 +35,8 @@ export interface ChatCallOptions {
 /** Minimal gateway surface the pipeline stages depend on (lets tests inject fakes). */
 export interface ChatGateway {
   chat(req: ChatRequest, opts?: ChatCallOptions): Promise<GatewayCallResult>;
+  /** Optional streaming variant; yields content deltas, returns the final result. */
+  streamChat?(req: ChatRequest, opts?: ChatCallOptions): AsyncGenerator<string, GatewayCallResult, void>;
 }
 
 export interface GatewayModel {
@@ -133,6 +135,84 @@ export class OpenRouterGateway {
     if (usage) result.usage = usage;
     if (typeof data.id === "string") result.id = data.id;
     if (typeof data.model === "string") result.model = data.model;
+    return result;
+  }
+
+  /** Streaming chat: yields content deltas, returns the final accumulated result with usage. */
+  async *streamChat(req: ChatRequest, opts: ChatCallOptions = {}): AsyncGenerator<string, GatewayCallResult, void> {
+    const body: Record<string, unknown> = {
+      model: req.model,
+      messages: req.messages,
+      stream: true,
+      usage: { include: true },
+    };
+    if (req.temperature !== undefined) body.temperature = req.temperature;
+    if (req.maxTokens !== undefined) body.max_tokens = req.maxTokens;
+
+    let res: Response;
+    try {
+      const init: RequestInit = { method: "POST", headers: this.headers(), body: JSON.stringify(body) };
+      if (opts.signal) init.signal = opts.signal;
+      res = await this.doFetch(`${this.base}/chat/completions`, init);
+    } catch (cause) {
+      throw new FusionError("gateway_error", "Gateway request failed.", { cause });
+    }
+    if (!res.ok || !res.body) {
+      throw new FusionError("gateway_error", `Gateway request failed (HTTP ${res.status}).`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    let usage: GatewayUsage | undefined;
+    let id: string | undefined;
+    let model: string | undefined;
+
+    const handle = (line: string): string | undefined => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith(":") || !trimmed.startsWith("data:")) return undefined;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") return undefined;
+      let chunk: Record<string, unknown>;
+      try {
+        chunk = JSON.parse(data) as Record<string, unknown>;
+      } catch {
+        return undefined;
+      }
+      const choices = chunk.choices as Array<{ delta?: { content?: unknown } }> | undefined;
+      const delta = choices?.[0]?.delta?.content;
+      if (chunk.usage) usage = toUsage(chunk.usage);
+      if (typeof chunk.id === "string") id = chunk.id;
+      if (typeof chunk.model === "string") model = chunk.model;
+      return typeof delta === "string" && delta.length > 0 ? delta : undefined;
+    };
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        const delta = handle(line);
+        if (delta !== undefined) {
+          content += delta;
+          yield delta;
+        }
+      }
+    }
+    // Flush any trailing line without a newline terminator.
+    const lastDelta = handle(buffer);
+    if (lastDelta !== undefined) {
+      content += lastDelta;
+      yield lastDelta;
+    }
+
+    const result: GatewayCallResult = { content };
+    if (usage) result.usage = usage;
+    if (id) result.id = id;
+    if (model) result.model = model;
     return result;
   }
 

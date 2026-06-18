@@ -16,7 +16,7 @@ import { applyWeb } from "../gateway/web.ts";
 import { OpenRouterGateway } from "../gateway/openrouter.ts";
 import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
-import { runWriter } from "./writer.ts";
+import { runWriter, consumeStream } from "./writer.ts";
 import type { ChatGateway, ChatRequest, GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
   ExecutionPlan,
@@ -53,6 +53,8 @@ export interface RunFusionOptions {
   title?: string;
   categories?: string;
   onProgress?: (stage: FusionStage) => void;
+  /** Stream the final answer (writer / bypass) token-by-token (CLI --stream). */
+  onWriterDelta?: (delta: string) => void;
   /** Injectable clock (tests). Defaults to Date.now. */
   now?: () => number;
 }
@@ -123,7 +125,8 @@ export async function runFusion(
     const { analysis, calls: judgeCalls } = await runJudge(plan, prompt, responses, deps);
 
     opts.onProgress?.("writer");
-    const { answer, call: writerCall } = await runWriter(plan, prompt, analysis, deps);
+    const writerDeps = opts.onWriterDelta ? { ...deps, onDelta: opts.onWriterDelta } : deps;
+    const { answer, call: writerCall } = await runWriter(plan, prompt, analysis, writerDeps);
 
     const { usage, costUsd } = aggregateUsage([...panelCalls, ...judgeCalls, writerCall]);
     const result: FusionRunResult = {
@@ -160,7 +163,11 @@ async function runBypass(
 
   let call: GatewayCallResult;
   try {
-    call = await deps.gateway.chat(req, { signal: deps.signal });
+    if (opts.onWriterDelta && deps.gateway.streamChat) {
+      call = await consumeStream(deps.gateway.streamChat(req, { signal: deps.signal }), opts.onWriterDelta);
+    } else {
+      call = await deps.gateway.chat(req, { signal: deps.signal });
+    }
   } catch (cause) {
     throw new FusionError("writer_failed", "Single-model call failed.", { cause, runId: plan.runId });
   }

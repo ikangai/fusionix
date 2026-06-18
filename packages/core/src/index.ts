@@ -14,6 +14,9 @@ export type { LoadConfigOptions } from "./config.ts";
 export { normalizeRequest } from "./normalize.ts";
 export type { NormalizeOptions } from "./normalize.ts";
 
+export { aggregateUsage, estimateCost } from "./cost.ts";
+export type { AggregatedUsage, CostEstimate, EstimateOptions, PriceEntry } from "./cost.ts";
+
 export { toChatCompletion } from "./result-wire.ts";
 export type { ChatCompletionResponse, FusionExtrasWire, WirePanelEntry, WireAnalysis } from "./result-wire.ts";
 
