@@ -163,6 +163,45 @@ test("timeout with ≥1 survivor proceeds to judge; final answer returned", asyn
   assert.ok(result.panel?.[1]?.error, "slow member aborted at deadline");
 });
 
+test("web 'unsupported' when web is requested but every member falls back from :online", async () => {
+  const gateway: ChatGateway = {
+    async chat(req) {
+      if (req.model.endsWith(":online")) throw new Error("web routing down");
+      if (req.model.startsWith("J")) return { content: VALID_ANALYSIS };
+      if (req.model.startsWith("W")) return { content: "FINAL" };
+      return { content: JSON.stringify({ answer: "ok" }) };
+    },
+  };
+  const result = await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x" });
+  assert.equal(result.web, "unsupported");
+  assert.equal(result.answer, "FINAL");
+  assert.ok(result.panel?.every((p) => !p.error), "members succeeded via no-web fallback");
+});
+
+test("backfills a streamed writer cost via getGeneration when the stream omits usage (§8.1)", async () => {
+  const gateway: ChatGateway = {
+    async chat(req) {
+      if (req.model.startsWith("J")) return { content: VALID_ANALYSIS }; // no cost
+      return { content: JSON.stringify({ answer: "ok" }), usage: usage(1, 1, 0.5), id: "p" };
+    },
+    async *streamChat() {
+      yield "F";
+      return { content: "F", id: "gen-writer" }; // streamed, no usage
+    },
+    async getGeneration(id) {
+      return id === "gen-writer" ? { cost: 0.25 } : undefined;
+    },
+  };
+  const result = await runFusion(userReq, {
+    config: makeConfig(),
+    gateway,
+    apiKey: "x",
+    onWriterDelta: () => {},
+  });
+  // panel 0.5×3 = 1.5 + writer backfilled 0.25 (judge reports none) = 1.75
+  assert.ok(Math.abs((result.costUsd ?? 0) - 1.75) < 1e-9, `got ${result.costUsd}`);
+});
+
 test("onWriterDelta streams the final answer when the gateway supports it", async () => {
   const gateway: ChatGateway = {
     async chat(req) {
@@ -190,6 +229,7 @@ test("timeout with zero survivors → all_panel_failed", async () => {
   const { gateway } = makeGateway((req, opts) => {
     if (req.model.startsWith("SLOW")) {
       return new Promise<GatewayCallResult>((_resolve, reject) => {
+        if (opts?.signal?.aborted) return reject(new Error("aborted"));
         opts?.signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true });
       });
     }

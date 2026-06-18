@@ -139,6 +139,8 @@ export async function runJudge(
         { role: "system", content: REPAIR_SYSTEM },
         { role: "user", content: repairUser },
       ],
+      // Repair is a deterministic reformat (not a re-judge), so force temperature 0
+      // regardless of the plan's judge temperature.
       temperature: 0,
     };
     const res = await deps.gateway.chat(repairReq, signalOpts);

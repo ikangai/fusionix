@@ -52,10 +52,12 @@ export function renderAnalysisText(a: FusionAnalysis): string {
   const lines: string[] = ["Judge analysis:"];
   if (nonEmpty(a.consensus)) lines.push("Consensus: " + a.consensus.join("; "));
   if (nonEmpty(a.contradictions)) lines.push("Contradictions: " + a.contradictions.map((c) => c.topic).join("; "));
-  if (nonEmpty(a.blindSpots)) lines.push("Blind spots: " + a.blindSpots.join("; "));
+  if (nonEmpty(a.partialCoverage)) lines.push("Partial coverage: " + a.partialCoverage.map((p) => p.point).join("; "));
   if (nonEmpty(a.uniqueInsights)) {
     lines.push("Unique insights: " + a.uniqueInsights.map((u) => `${u.model}: ${u.insight}`).join("; "));
   }
+  if (nonEmpty(a.blindSpots)) lines.push("Blind spots: " + a.blindSpots.join("; "));
+  if (nonEmpty(a.ranking)) lines.push("Ranking: " + a.ranking.join(" > "));
   return lines.join("\n");
 }
 

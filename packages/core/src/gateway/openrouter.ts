@@ -37,6 +37,8 @@ export interface ChatGateway {
   chat(req: ChatRequest, opts?: ChatCallOptions): Promise<GatewayCallResult>;
   /** Optional streaming variant; yields content deltas, returns the final result. */
   streamChat?(req: ChatRequest, opts?: ChatCallOptions): AsyncGenerator<string, GatewayCallResult, void>;
+  /** Optional best-effort cost lookup for backfill (§8.1). */
+  getGeneration?(id: string): Promise<{ cost?: number } | undefined>;
 }
 
 export interface GatewayModel {
@@ -129,7 +131,7 @@ export class OpenRouterGateway {
     }
 
     const choices = data.choices as Array<{ message?: { content?: unknown } }> | undefined;
-    const content = contentToString((choices?.[0]?.message?.content ?? "") as string);
+    const content = contentToString(choices?.[0]?.message?.content ?? "");
     const result: GatewayCallResult = { content, raw: data };
     const usage = toUsage(data.usage);
     if (usage) result.usage = usage;
@@ -228,7 +230,11 @@ export class OpenRouterGateway {
     }
   }
 
-  /** Best-effort cost backfill via `/generation` (§8.1). Returns undefined on any failure. */
+  /**
+   * Best-effort cost backfill via `/generation` (§8.1).
+   * Returns `{ cost }` when known, `{}` when the lookup succeeded but reported no cost,
+   * and `undefined` when the lookup failed (non-2xx or threw).
+   */
   async getGeneration(id: string): Promise<GenerationCost | undefined> {
     try {
       const res = await this.doFetch(`${this.base}/generation?id=${encodeURIComponent(id)}`, {

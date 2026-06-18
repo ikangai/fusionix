@@ -107,6 +107,22 @@ test("panel temperature and maxTokens are passed through", async () => {
   assert.equal(calls[0]!.req.maxTokens, 999);
 });
 
+test("webUsed is true when the :online variant serves a member", async () => {
+  const { gateway } = fakeGateway(() => ({ content: JSON.stringify({ answer: "ok" }) }));
+  const out = await runPanel(makePlan({ panel: ["A"], web: true }), { gateway });
+  assert.equal(out.webUsed, true);
+});
+
+test("webUsed is false when a member falls back from :online (§15)", async () => {
+  const { gateway } = fakeGateway((model) => {
+    if (model.endsWith(":online")) throw new Error("no web");
+    return { content: JSON.stringify({ answer: "ok" }) };
+  });
+  const out = await runPanel(makePlan({ panel: ["A"], web: true }), { gateway });
+  assert.equal(out.responses[0]!.answer, "ok"); // succeeded via fallback
+  assert.equal(out.webUsed, false);
+});
+
 test("the abort signal is forwarded to each call", async () => {
   const { gateway, calls } = fakeGateway(() => ({ content: "{}" }));
   const ac = new AbortController();

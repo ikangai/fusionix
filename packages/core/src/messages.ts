@@ -6,15 +6,25 @@
  * it. Judge/writer receive a *compact rendering* of the request, not the full
  * transcript.
  */
-import type { ChatMessage, ContentPart } from "./types.ts";
+import type { ChatMessage } from "./types.ts";
 
-export function contentToString(content: string | ContentPart[] | null | undefined): string {
+/** Coerce message content (string, content-part array, null, or any gateway value) to text. */
+export function contentToString(content: unknown): string {
   if (content == null) return "";
   if (typeof content === "string") return content;
-  return content
-    .map((part) => (typeof part.text === "string" ? part.text : ""))
-    .filter((t) => t.length > 0)
-    .join("\n");
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => {
+        if (part && typeof part === "object") {
+          const text = (part as { text?: unknown }).text;
+          if (typeof text === "string") return text;
+        }
+        return "";
+      })
+      .filter((t) => t.length > 0)
+      .join("\n");
+  }
+  return "";
 }
 
 /** Fold `developer` messages into `system`; otherwise preserve roles. Pure (no mutation). */

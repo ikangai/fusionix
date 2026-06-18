@@ -105,7 +105,8 @@ async function checkMaxCost(
     const normOpts: { webOverride?: boolean } = {};
     if (webOverride !== undefined) normOpts.webOverride = webOverride;
     const plan = normalizeRequest(request, config, normOpts);
-    const prices = await (deps.loadPrices ?? defaultLoadPrices)(apiKey, env.FUSION_DEFAULT_GATEWAY);
+    // Use the resolved gateway (config wins over the env var) so prices match the run target.
+    const prices = await (deps.loadPrices ?? defaultLoadPrices)(apiKey, config.gateway);
     const { estimateUsd, missing } = estimateCost(plan, prices, { promptChars: prompt.length });
     if (missing.length > 0) {
       stderr(`fusion: --max-cost: price unknown for ${missing.join(", ")}; cannot enforce pre-flight. Proceeding.\n`);
@@ -176,6 +177,9 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   if (!apiKey) {
     stderr("fusion: OPENROUTER_API_KEY is not set (required for --local mode).\n");
     return 1;
+  }
+  if (args.apiUrl) {
+    stderr("fusion: --api-url is ignored in --local mode (it targets the hosted API, Phase 2).\n");
   }
 
   const { request, webOverride } = buildRequest(args, prompt);

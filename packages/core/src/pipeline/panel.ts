@@ -6,11 +6,12 @@
  * `{ model, error }`. Panel JSON that fails to parse keeps the raw text as
  * `answer` — there is NO repair call in v1 (§14.1).
  */
-import { applyWeb } from "../gateway/web.ts";
 import { extractJson } from "../json.ts";
 import { prependSystem } from "../messages.ts";
 import { PANEL_SYSTEM, composeSystem } from "../prompts.ts";
-import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
+import { chatWithWebFallback } from "./web-call.ts";
+import type { WebCallOptions } from "./web-call.ts";
+import type { ChatGateway } from "../gateway/openrouter.ts";
 import type { Citation, ExecutionPlan, GatewayCallResult, PanelResponse } from "../types.ts";
 
 export interface PanelDeps {
@@ -23,6 +24,8 @@ export interface PanelOutcome {
   responses: PanelResponse[];
   /** Successful gateway calls, for cost aggregation. */
   calls: GatewayCallResult[];
+  /** True if the gateway-native web mechanism was actually used by any member (§15). */
+  webUsed: boolean;
 }
 
 function errorMessage(err: unknown): string {
@@ -72,12 +75,13 @@ export async function runPanel(plan: ExecutionPlan, deps: PanelDeps): Promise<Pa
 
   const settled = await Promise.all(
     plan.panel.map(async (model) => {
-      const req: ChatRequest = { model: applyWeb(model, plan.web), messages };
-      if (plan.panelTemperature !== undefined) req.temperature = plan.panelTemperature;
-      if (plan.panelMaxTokens !== undefined) req.maxTokens = plan.panelMaxTokens;
+      const webOpts: WebCallOptions = { web: plan.web };
+      if (plan.panelTemperature !== undefined) webOpts.temperature = plan.panelTemperature;
+      if (plan.panelMaxTokens !== undefined) webOpts.maxTokens = plan.panelMaxTokens;
+      if (deps.signal) webOpts.signal = deps.signal;
       try {
-        const res = await deps.gateway.chat(req, deps.signal ? { signal: deps.signal } : {});
-        return { ok: true as const, model, res };
+        const { result, usedWeb } = await chatWithWebFallback(deps.gateway, model, messages, webOpts);
+        return { ok: true as const, model, res: result, usedWeb };
       } catch (err) {
         return { ok: false as const, model, err };
       }
@@ -86,13 +90,15 @@ export async function runPanel(plan: ExecutionPlan, deps: PanelDeps): Promise<Pa
 
   const responses: PanelResponse[] = [];
   const calls: GatewayCallResult[] = [];
+  let webUsed = false;
   for (const outcome of settled) {
     if (outcome.ok) {
       calls.push(outcome.res);
       responses.push(parsePanelContent(outcome.model, outcome.res.content));
+      if (outcome.usedWeb) webUsed = true;
     } else {
       responses.push({ model: outcome.model, error: { message: errorMessage(outcome.err) } });
     }
   }
-  return { responses, calls };
+  return { responses, calls, webUsed };
 }

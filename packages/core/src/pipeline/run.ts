@@ -17,6 +17,8 @@ import { OpenRouterGateway } from "../gateway/openrouter.ts";
 import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
 import { runWriter, consumeStream } from "./writer.ts";
+import { chatWithWebFallback } from "./web-call.ts";
+import type { WebCallOptions } from "./web-call.ts";
 import type { ChatGateway, ChatRequest, GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
   ExecutionPlan,
@@ -72,11 +74,35 @@ function buildGateway(config: FusionConfig, opts: RunFusionOptions): ChatGateway
   return new OpenRouterGateway(clientOpts);
 }
 
-function resolveWebStatus(plan: ExecutionPlan, panelSuccessCount: number): WebStatus {
+/**
+ * Best-effort cost backfill (§8.1). For any call that has a generation id but no
+ * reported cost (e.g. a streamed call whose gateway omitted the usage chunk),
+ * look the cost up via `/generation`. Never blocks the run; failures are ignored.
+ */
+async function backfillCosts(gateway: ChatGateway, calls: GatewayCallResult[]): Promise<void> {
+  if (!gateway.getGeneration) return;
+  const lookup = gateway.getGeneration.bind(gateway);
+  await Promise.all(
+    calls.map(async (call) => {
+      if (!call.id || (call.usage && typeof call.usage.cost === "number")) return;
+      try {
+        const gen = await lookup(call.id);
+        if (gen && typeof gen.cost === "number") {
+          if (call.usage) call.usage.cost = gen.cost;
+          else call.usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: gen.cost };
+        }
+      } catch {
+        // best-effort; ignore
+      }
+    }),
+  );
+}
+
+function resolveWebStatus(plan: ExecutionPlan, webUsed: boolean): WebStatus {
   if (!plan.web) return "off";
-  // v1 uses OpenRouter :online (universally available). "used" = mechanism enabled and the
-  // pipeline produced output; "unsupported" is reserved for when no member could use it.
-  return panelSuccessCount > 0 ? "used" : "unsupported";
+  // web requested: "used" if the :online mechanism actually served a member,
+  // "unsupported" if every successful member had to fall back to no-web (§15).
+  return webUsed ? "used" : "unsupported";
 }
 
 export async function runFusion(
@@ -113,7 +139,7 @@ export async function runFusion(
     }
 
     opts.onProgress?.("panel");
-    const { responses, calls: panelCalls } = await runPanel(plan, deps);
+    const { responses, calls: panelCalls, webUsed } = await runPanel(plan, deps);
     const successes = responses.filter((r) => r.error === undefined && r.answer !== undefined);
     if (successes.length === 0) {
       throw new FusionError("all_panel_failed", "All panel models failed.", { runId: plan.runId });
@@ -128,7 +154,9 @@ export async function runFusion(
     const writerDeps = opts.onWriterDelta ? { ...deps, onDelta: opts.onWriterDelta } : deps;
     const { answer, call: writerCall } = await runWriter(plan, prompt, analysis, writerDeps);
 
-    const { usage, costUsd } = aggregateUsage([...panelCalls, ...judgeCalls, writerCall]);
+    const allCalls = [...panelCalls, ...judgeCalls, writerCall];
+    await backfillCosts(deps.gateway, allCalls);
+    const { usage, costUsd } = aggregateUsage(allCalls);
     const result: FusionRunResult = {
       runId: plan.runId,
       answer,
@@ -138,7 +166,7 @@ export async function runFusion(
       usage,
       costUsd,
       durationMs: now() - startedAt,
-      web: resolveWebStatus(plan, successes.length),
+      web: resolveWebStatus(plan, webUsed),
       maxToolCallsEnforced: false,
       created: Math.floor(startedAt / 1000),
     };
@@ -157,16 +185,24 @@ async function runBypass(
   now: () => number,
 ): Promise<FusionRunResult> {
   opts.onProgress?.("writer");
-  const req: ChatRequest = { model: applyWeb(plan.writer, plan.web), messages: plan.messages };
-  if (plan.writerTemperature !== undefined) req.temperature = plan.writerTemperature;
-  if (plan.writerMaxTokens !== undefined) req.maxTokens = plan.writerMaxTokens;
 
   let call: GatewayCallResult;
+  let usedWeb = false;
   try {
     if (opts.onWriterDelta && deps.gateway.streamChat) {
+      // Streaming bypass uses :online when web is on; no fallback while streaming.
+      const req: ChatRequest = { model: applyWeb(plan.writer, plan.web), messages: plan.messages };
+      if (plan.writerTemperature !== undefined) req.temperature = plan.writerTemperature;
+      if (plan.writerMaxTokens !== undefined) req.maxTokens = plan.writerMaxTokens;
       call = await consumeStream(deps.gateway.streamChat(req, { signal: deps.signal }), opts.onWriterDelta);
+      usedWeb = plan.web;
     } else {
-      call = await deps.gateway.chat(req, { signal: deps.signal });
+      const webOpts: WebCallOptions = { web: plan.web, signal: deps.signal };
+      if (plan.writerTemperature !== undefined) webOpts.temperature = plan.writerTemperature;
+      if (plan.writerMaxTokens !== undefined) webOpts.maxTokens = plan.writerMaxTokens;
+      const out = await chatWithWebFallback(deps.gateway, plan.writer, plan.messages, webOpts);
+      call = out.result;
+      usedWeb = out.usedWeb;
     }
   } catch (cause) {
     throw new FusionError("writer_failed", "Single-model call failed.", { cause, runId: plan.runId });
@@ -175,6 +211,7 @@ async function runBypass(
     throw new FusionError("writer_failed", "Single-model call returned an empty answer.", { runId: plan.runId });
   }
 
+  await backfillCosts(deps.gateway, [call]);
   const { usage, costUsd } = aggregateUsage([call]);
   // §6.7: extras carry only run_id, duration_ms and web; omit panel/analysis.
   return {
@@ -184,7 +221,7 @@ async function runBypass(
     usage,
     costUsd,
     durationMs: now() - startedAt,
-    web: plan.web ? "used" : "off",
+    web: resolveWebStatus(plan, usedWeb),
     maxToolCallsEnforced: false,
     created: Math.floor(startedAt / 1000),
   };
