@@ -13,13 +13,13 @@ import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
 import { normalizeRequest } from "../normalize.ts";
 import { applyWeb } from "../gateway/web.ts";
-import { OpenRouterGateway } from "../gateway/openrouter.ts";
+import { OpenRouterGateway, makeChatRequest } from "../gateway/openrouter.ts";
 import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
 import { runWriter, consumeStream } from "./writer.ts";
 import { chatWithWebFallback } from "./web-call.ts";
 import type { WebCallOptions } from "./web-call.ts";
-import type { ChatGateway, ChatRequest, GatewayClientOptions } from "../gateway/openrouter.ts";
+import type { ChatGateway, GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
   ExecutionPlan,
   FusionChatCompletionRequest,
@@ -191,9 +191,10 @@ async function runBypass(
   try {
     if (opts.onWriterDelta && deps.gateway.streamChat) {
       // Streaming bypass uses :online when web is on; no fallback while streaming.
-      const req: ChatRequest = { model: applyWeb(plan.writer, plan.web), messages: plan.messages };
-      if (plan.writerTemperature !== undefined) req.temperature = plan.writerTemperature;
-      if (plan.writerMaxTokens !== undefined) req.maxTokens = plan.writerMaxTokens;
+      const req = makeChatRequest(applyWeb(plan.writer, plan.web), plan.messages, {
+        temperature: plan.writerTemperature,
+        maxTokens: plan.writerMaxTokens,
+      });
       call = await consumeStream(deps.gateway.streamChat(req, { signal: deps.signal }), opts.onWriterDelta);
       usedWeb = plan.web;
     } else {

@@ -64,11 +64,18 @@ test("fusion extras use snake_case and keep panel order with failures in place",
   assert.deepEqual(fusion.analysis?.blind_spots, ["b"]);
 });
 
-test("bypass result omits panel and analysis from the extras (§6.7)", () => {
+test("bypass extras carry only run_id, duration_ms and web (§6.7)", () => {
   const r = toChatCompletion(baseResult({ panel: undefined, analysis: undefined, web: "off" }));
   assert.equal(r.fusion.panel, undefined);
   assert.equal(r.fusion.analysis, undefined);
   assert.equal(r.fusion.web, "off");
+  assert.equal(r.fusion.run_id, "fusion-run-1");
+  assert.equal(typeof r.fusion.duration_ms, "number");
+  // §6.7: "only run_id, duration_ms, and web" — cost/usage extras are omitted.
+  assert.ok(!("cost_usd" in r.fusion), "cost_usd omitted in bypass");
+  assert.ok(!("max_tool_calls_enforced" in r.fusion), "max_tool_calls_enforced omitted in bypass");
+  // Top-level OpenAI-standard usage is still present.
+  assert.ok(r.usage);
   assert.equal(r.choices[0]!.message.content, "Final answer.");
 });
 

@@ -52,6 +52,21 @@ test("streamChat yields content deltas and returns the final result with usage",
   assert.deepEqual(body.usage, { include: true });
 });
 
+test("streamChat aborts an oversized unterminated stream instead of buffering unbounded", async () => {
+  const huge = "x".repeat(9 * 1024 * 1024); // 9MB with no newline
+  const { fn } = sseFetch(huge);
+  const gw = new OpenRouterGateway({ apiKey: "K", baseUrl: "https://gw/api/v1", fetch: fn });
+  await assert.rejects(
+    async () => {
+      const gen = gw.streamChat({ model: "m", messages: [{ role: "user", content: "q" }] });
+      // eslint-disable-next-line no-empty
+      for await (const _ of gen) {
+      }
+    },
+    (err: unknown) => isFusionError(err) && err.code === "gateway_error",
+  );
+});
+
 test("streamChat maps a non-2xx to gateway_error", async () => {
   const { fn } = sseFetch("", 500);
   const gw = new OpenRouterGateway({ apiKey: "K", baseUrl: "https://gw/api/v1", fetch: fn });

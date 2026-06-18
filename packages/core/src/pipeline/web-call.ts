@@ -8,6 +8,7 @@
  * a genuine model failure and propagates.
  */
 import { applyWeb } from "../gateway/web.ts";
+import { makeChatRequest } from "../gateway/openrouter.ts";
 import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
 import type { GatewayCallResult } from "../types.ts";
 
@@ -31,12 +32,8 @@ export async function chatWithWebFallback(
   opts: WebCallOptions,
 ): Promise<WebCallResult> {
   const callOpts = opts.signal ? { signal: opts.signal } : {};
-  const build = (model: string): ChatRequest => {
-    const req: ChatRequest = { model, messages };
-    if (opts.temperature !== undefined) req.temperature = opts.temperature;
-    if (opts.maxTokens !== undefined) req.maxTokens = opts.maxTokens;
-    return req;
-  };
+  const build = (model: string): ChatRequest =>
+    makeChatRequest(model, messages, { temperature: opts.temperature, maxTokens: opts.maxTokens });
 
   if (!opts.web) {
     return { result: await gateway.chat(build(baseModel), callOpts), usedWeb: false };

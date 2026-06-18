@@ -8,7 +8,8 @@
  */
 import { FusionError } from "../errors.ts";
 import { WRITER_SYSTEM, composeSystem, renderWriterUser } from "../prompts.ts";
-import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
+import { makeChatRequest } from "../gateway/openrouter.ts";
+import type { ChatGateway } from "../gateway/openrouter.ts";
 import type { ExecutionPlan, FusionAnalysis, GatewayCallResult } from "../types.ts";
 
 export interface WriterDeps {
@@ -44,15 +45,15 @@ export async function runWriter(
   const systemText = composeSystem(WRITER_SYSTEM, plan.writerSystem);
   const user = renderWriterUser(prompt, JSON.stringify(analysis));
 
-  const req: ChatRequest = {
-    model: plan.writer, // writer never uses web
-    messages: [
+  // Writer never uses web.
+  const req = makeChatRequest(
+    plan.writer,
+    [
       { role: "system", content: systemText },
       { role: "user", content: user },
     ],
-  };
-  if (plan.writerTemperature !== undefined) req.temperature = plan.writerTemperature;
-  if (plan.writerMaxTokens !== undefined) req.maxTokens = plan.writerMaxTokens;
+    { temperature: plan.writerTemperature, maxTokens: plan.writerMaxTokens },
+  );
 
   const callOpts = deps.signal ? { signal: deps.signal } : {};
   let call: GatewayCallResult;

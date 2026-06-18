@@ -36,10 +36,12 @@ export interface FusionExtrasWire {
   run_id: string;
   panel?: WirePanelEntry[];
   analysis?: WireAnalysis;
-  cost_usd: number | null;
+  /** Omitted in single-model bypass (§6.7 limits extras to run_id/duration_ms/web). */
+  cost_usd?: number | null;
   duration_ms: number;
   web: WebStatus;
-  max_tool_calls_enforced: boolean;
+  /** Omitted in single-model bypass (§6.7). */
+  max_tool_calls_enforced?: boolean;
 }
 
 export interface ChatCompletionResponse {
@@ -76,13 +78,18 @@ function toWireAnalysis(a: FusionAnalysis): WireAnalysis {
 }
 
 export function toChatCompletion(result: FusionRunResult): ChatCompletionResponse {
-  const fusion: FusionExtrasWire = {
-    run_id: result.runId,
-    cost_usd: result.costUsd,
-    duration_ms: result.durationMs,
-    web: result.web,
-    max_tool_calls_enforced: result.maxToolCallsEnforced,
-  };
+  // Bypass (§6.7): panel/analysis are absent, and the fusion extras are limited
+  // to run_id, duration_ms and web. Deliberation runs carry the full extras.
+  const bypass = !result.panel && !result.analysis;
+  const fusion: FusionExtrasWire = bypass
+    ? { run_id: result.runId, duration_ms: result.durationMs, web: result.web }
+    : {
+        run_id: result.runId,
+        cost_usd: result.costUsd,
+        duration_ms: result.durationMs,
+        web: result.web,
+        max_tool_calls_enforced: result.maxToolCallsEnforced,
+      };
   if (result.panel) fusion.panel = toWirePanel(result.panel);
   if (result.analysis) fusion.analysis = toWireAnalysis(result.analysis);
 

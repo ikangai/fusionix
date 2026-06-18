@@ -32,6 +32,18 @@ export interface ChatCallOptions {
   signal?: AbortSignal;
 }
 
+/** Build a ChatRequest, including temperature/maxTokens only when defined. */
+export function makeChatRequest(
+  model: string,
+  messages: ChatMessage[],
+  opts: { temperature?: number; maxTokens?: number } = {},
+): ChatRequest {
+  const req: ChatRequest = { model, messages };
+  if (opts.temperature !== undefined) req.temperature = opts.temperature;
+  if (opts.maxTokens !== undefined) req.maxTokens = opts.maxTokens;
+  return req;
+}
+
 /** Minimal gateway surface the pipeline stages depend on (lets tests inject fakes). */
 export interface ChatGateway {
   chat(req: ChatRequest, opts?: ChatCallOptions): Promise<GatewayCallResult>;
@@ -49,6 +61,10 @@ export interface GatewayModel {
 export interface GenerationCost {
   cost?: number;
 }
+
+// Defensive caps so a misbehaving/malicious stream cannot exhaust memory.
+const MAX_SSE_LINE_CHARS = 8 * 1024 * 1024;
+const MAX_SSE_CONTENT_CHARS = 16 * 1024 * 1024;
 
 function toUsage(raw: unknown): GatewayUsage | undefined {
   if (raw == null || typeof raw !== "object") return undefined;
@@ -160,7 +176,13 @@ export class OpenRouterGateway {
       throw new FusionError("gateway_error", "Gateway request failed.", { cause });
     }
     if (!res.ok || !res.body) {
-      throw new FusionError("gateway_error", `Gateway request failed (HTTP ${res.status}).`);
+      let detail: unknown;
+      try {
+        detail = await res.json();
+      } catch {
+        detail = undefined;
+      }
+      throw new FusionError("gateway_error", `Gateway request failed (HTTP ${res.status}).`, { details: detail });
     }
 
     const reader = res.body.getReader();
@@ -194,12 +216,18 @@ export class OpenRouterGateway {
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
+      if (buffer.length > MAX_SSE_LINE_CHARS) {
+        throw new FusionError("gateway_error", "Gateway stream exceeded the maximum line size.");
+      }
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
       for (const line of lines) {
         const delta = handle(line);
         if (delta !== undefined) {
           content += delta;
+          if (content.length > MAX_SSE_CONTENT_CHARS) {
+            throw new FusionError("gateway_error", "Gateway stream exceeded the maximum response size.");
+          }
           yield delta;
         }
       }

@@ -99,6 +99,23 @@ test("listPresetsRedacted redacts every preset", async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
+test("throws fast when defaultPreset points at a missing preset", async () => {
+  const dir = await emptyDir();
+  await assert.rejects(() => loadConfig({ env: { FUSION_DEFAULT_PRESET: "does-not-exist" }, cwd: dir }));
+  await rm(dir, { recursive: true, force: true });
+});
+
+test("ignores reserved preset keys like __proto__ (no prototype pollution)", async () => {
+  const dir = await emptyDir();
+  const file = join(dir, "fusion.config.json");
+  await writeFile(file, '{"presets":{"__proto__":{"panel":["x"],"judge":"j","writer":"w","polluted":true}}}');
+  const cfg = await loadConfig({ configPath: file, env: {}, cwd: dir });
+  assert.equal(Object.keys(cfg.presets).length, 6, "reserved key not added as a preset");
+  assert.ok(!Object.keys(cfg.presets).includes("__proto__"));
+  assert.equal(({} as Record<string, unknown>).polluted, undefined, "Object.prototype not polluted");
+  await rm(dir, { recursive: true, force: true });
+});
+
 test("explicit configPath that does not exist throws", async () => {
   const dir = await emptyDir();
   await assert.rejects(() => loadConfig({ configPath: join(dir, "nope.json"), env: {}, cwd: dir }));

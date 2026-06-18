@@ -92,13 +92,20 @@ export async function runPanel(plan: ExecutionPlan, deps: PanelDeps): Promise<Pa
   const calls: GatewayCallResult[] = [];
   let webUsed = false;
   for (const outcome of settled) {
-    if (outcome.ok) {
-      calls.push(outcome.res);
-      responses.push(parsePanelContent(outcome.model, outcome.res.content));
-      if (outcome.usedWeb) webUsed = true;
-    } else {
+    if (!outcome.ok) {
       responses.push({ model: outcome.model, error: { message: errorMessage(outcome.err) } });
+      continue;
     }
+    // The call succeeded; count it for cost regardless of content.
+    calls.push(outcome.res);
+    if (outcome.res.content.trim().length === 0) {
+      // An empty body is not a usable answer — treat as a member failure so it
+      // does not masquerade as a real panel answer or feed the judge nothing.
+      responses.push({ model: outcome.model, error: { message: "Model returned an empty response." } });
+      continue;
+    }
+    responses.push(parsePanelContent(outcome.model, outcome.res.content));
+    if (outcome.usedWeb) webUsed = true;
   }
   return { responses, calls, webUsed };
 }

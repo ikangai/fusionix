@@ -43,6 +43,9 @@ export interface LoadConfigOptions {
 
 const DEFAULT_CONFIG_URL = new URL("../config/default.config.json", import.meta.url);
 
+// Never treat these object keys as preset names (avoids prototype-pollution shapes).
+const RESERVED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function toPreset(key: string, raw: RawPreset): ResolvedPreset {
   const preset: ResolvedPreset = {
     name: raw.name ?? key,
@@ -63,6 +66,7 @@ function toPreset(key: string, raw: RawPreset): ResolvedPreset {
 function normalizeConfig(raw: RawConfig): FusionConfig {
   const presets: Record<string, ResolvedPreset> = {};
   for (const [key, value] of Object.entries(raw.presets ?? {})) {
+    if (RESERVED_KEYS.has(key)) continue;
     presets[key] = toPreset(key, value);
   }
   const config: FusionConfig = {
@@ -91,6 +95,7 @@ function mergeExternal(base: FusionConfig, raw: RawConfig): FusionConfig {
   if (defaultPreset !== undefined) merged.defaultPreset = defaultPreset;
 
   for (const [key, value] of Object.entries(raw.presets ?? {})) {
+    if (RESERVED_KEYS.has(key)) continue;
     const existing = base.presets[key];
     // Deep-merge per preset: external fields win, base fields preserved.
     merged.presets[key] = existing
@@ -146,6 +151,15 @@ export async function loadConfig(opts: LoadConfigOptions = {}): Promise<FusionCo
   // Env overrides win last.
   if (env.FUSION_DEFAULT_GATEWAY) config.gateway = env.FUSION_DEFAULT_GATEWAY;
   if (env.FUSION_DEFAULT_PRESET) config.defaultPreset = env.FUSION_DEFAULT_PRESET;
+
+  // Fail fast on a misconfigured default preset instead of surfacing it later as
+  // a confusing "resolved panel is empty" at request time.
+  if (config.defaultPreset && !config.presets[config.defaultPreset]) {
+    throw new FusionError(
+      "internal_error",
+      `Configured default preset '${config.defaultPreset}' is not defined in presets.`,
+    );
+  }
 
   return config;
 }

@@ -9,6 +9,7 @@
 import { FusionError } from "../errors.ts";
 import { extractJson } from "../json.ts";
 import { JUDGE_SYSTEM, composeSystem, renderAnswers, renderJudgeUser } from "../prompts.ts";
+import { makeChatRequest } from "../gateway/openrouter.ts";
 import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
 import type {
   Contradiction,
@@ -99,12 +100,8 @@ export async function runJudge(
   const calls: GatewayCallResult[] = [];
   const signalOpts = deps.signal ? { signal: deps.signal } : {};
 
-  const baseReq = (messages: ChatRequest["messages"]): ChatRequest => {
-    const req: ChatRequest = { model: plan.judge, messages };
-    if (plan.judgeTemperature !== undefined) req.temperature = plan.judgeTemperature;
-    if (plan.judgeMaxTokens !== undefined) req.maxTokens = plan.judgeMaxTokens;
-    return req;
-  };
+  const baseReq = (messages: ChatRequest["messages"]): ChatRequest =>
+    makeChatRequest(plan.judge, messages, { temperature: plan.judgeTemperature, maxTokens: plan.judgeMaxTokens });
 
   // Initial judge call. (Judge never uses web.)
   let firstContent: string;
@@ -133,16 +130,16 @@ export async function runJudge(
       'Convert your previous output into exactly this JSON shape:\n' +
       '{ "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }\n\n' +
       `Previous output:\n${firstContent}`;
-    const repairReq: ChatRequest = {
-      model: plan.judge,
-      messages: [
+    // Repair is a deterministic reformat (not a re-judge), so force temperature 0
+    // regardless of the plan's judge temperature.
+    const repairReq = makeChatRequest(
+      plan.judge,
+      [
         { role: "system", content: REPAIR_SYSTEM },
         { role: "user", content: repairUser },
       ],
-      // Repair is a deterministic reformat (not a re-judge), so force temperature 0
-      // regardless of the plan's judge temperature.
-      temperature: 0,
-    };
+      { temperature: 0 },
+    );
     const res = await deps.gateway.chat(repairReq, signalOpts);
     calls.push(res);
     const repaired = extractObject(res.content);

@@ -107,6 +107,17 @@ test("panel temperature and maxTokens are passed through", async () => {
   assert.equal(calls[0]!.req.maxTokens, 999);
 });
 
+test("an empty-content response is treated as a member failure (cost still counted)", async () => {
+  const { gateway } = fakeGateway(() => ({
+    content: "   ",
+    usage: { prompt_tokens: 1, completion_tokens: 0, total_tokens: 1, cost: 0.01 },
+  }));
+  const { responses, calls } = await runPanel(makePlan({ panel: ["A"] }), { gateway });
+  assert.ok(responses[0]!.error, "empty response marked as failure");
+  assert.equal(responses[0]!.answer, undefined);
+  assert.equal(calls.length, 1, "the call still counts toward cost");
+});
+
 test("webUsed is true when the :online variant serves a member", async () => {
   const { gateway } = fakeGateway(() => ({ content: JSON.stringify({ answer: "ok" }) }));
   const out = await runPanel(makePlan({ panel: ["A"], web: true }), { gateway });
