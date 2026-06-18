@@ -20,6 +20,7 @@
     "fusion": "node --conditions=development packages/cli/src/index.ts"
   },
   "devDependencies": {
+    "@types/node": "^25.9.3",
     "typescript": "^5.8.3"
   }
 }
