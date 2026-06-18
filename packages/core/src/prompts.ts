@@ -1,0 +1,68 @@
+/**
+ * Pipeline prompts (spec §14).
+ *
+ * The system constants are the instruction text from §14.1/§14.2/§14.3 minus
+ * the inline `{{prompt}}`/`{{answers}}`/`{{analysis}}` tails — those are sent as
+ * separate messages (§14.0). Preset `*System` strings are appended via
+ * `composeSystem`.
+ */
+import type { PanelResponse } from "./types.ts";
+
+export const PANEL_SYSTEM = `You are one expert in a panel answering the user's question independently.
+Give a direct, useful answer. Be specific. If you are uncertain, state your uncertainty.
+Return JSON:
+{ "answer": "...", "assumptions": [], "risks": [], "citations": [] }`;
+
+export const JUDGE_SYSTEM = `You compare several model answers to the same user question.
+Do not write the final answer. Compare the answers.
+Return JSON:
+{ "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }`;
+
+export const WRITER_SYSTEM = `Write the final answer to the user's question using the judge analysis.
+Rules:
+- Lead with the answer.
+- Use consensus as high-confidence material.
+- Mention important disagreements when relevant.
+- Preserve useful unique insights.
+- Do not mention the panel, judge, or internal process.`;
+
+export function composeSystem(base: string, presetSystem?: string): string {
+  const extra = (presetSystem ?? "").trim();
+  return extra ? `${base}\n\n${extra}` : base;
+}
+
+function renderList(label: string, items?: string[]): string {
+  if (!items || items.length === 0) return "";
+  return `${label}:\n${items.map((i) => `- ${i}`).join("\n")}`;
+}
+
+/** Render successful panel answers for the judge (`{{answers}}`). Failed members are excluded. */
+export function renderAnswers(panel: PanelResponse[]): string {
+  const blocks: string[] = [];
+  let n = 0;
+  for (const p of panel) {
+    if (p.error || p.answer === undefined) continue;
+    n += 1;
+    const sections: string[] = [`[${n}] ${p.model}`, p.answer.trim()];
+    const assumptions = renderList("Assumptions", p.assumptions);
+    if (assumptions) sections.push(assumptions);
+    const risks = renderList("Risks", p.risks);
+    if (risks) sections.push(risks);
+    if (p.citations && p.citations.length > 0) {
+      const cites = p.citations
+        .map((c) => `- ${c.title ? `${c.title}: ` : ""}${c.url}`)
+        .join("\n");
+      sections.push(`Citations:\n${cites}`);
+    }
+    blocks.push(sections.join("\n"));
+  }
+  return blocks.join("\n\n---\n\n");
+}
+
+export function renderJudgeUser(prompt: string, answers: string): string {
+  return `User question:\n${prompt}\n\nAnswers:\n${answers}`;
+}
+
+export function renderWriterUser(prompt: string, analysisJson: string): string {
+  return `User question:\n${prompt}\n\nJudge analysis:\n${analysisJson}`;
+}
