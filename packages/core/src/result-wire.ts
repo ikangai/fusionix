@@ -1,14 +1,14 @@
 /**
  * Wire shaping (spec §6.3).
  *
- * Maps the canonical (camelCase) `FusionRunResult` into the OpenAI-compatible
- * `chat.completion` response with the non-standard snake_case `fusion` field.
+ * Maps the canonical (camelCase) `FusionixRunResult` into the OpenAI-compatible
+ * `chat.completion` response with the non-standard snake_case `fusionix` field.
  * Used by the CLI `--format json` and (Phase 2) the hosted API.
  */
 import type {
   Citation,
-  FusionAnalysis,
-  FusionRunResult,
+  FusionixAnalysis,
+  FusionixRunResult,
   PanelResponse,
   Usage,
   WebStatus,
@@ -32,7 +32,7 @@ export interface WireAnalysis {
   ranking: string[];
 }
 
-export interface FusionExtrasWire {
+export interface FusionixExtrasWire {
   run_id: string;
   panel?: WirePanelEntry[];
   analysis?: WireAnalysis;
@@ -51,7 +51,7 @@ export interface ChatCompletionResponse {
   model: string;
   choices: { index: number; message: { role: "assistant"; content: string }; finish_reason: "stop" }[];
   usage: Usage;
-  fusion: FusionExtrasWire;
+  fusionix: FusionixExtrasWire;
 }
 
 function toWirePanel(panel: PanelResponse[]): WirePanelEntry[] {
@@ -66,7 +66,7 @@ function toWirePanel(panel: PanelResponse[]): WirePanelEntry[] {
   });
 }
 
-function toWireAnalysis(a: FusionAnalysis): WireAnalysis {
+function toWireAnalysis(a: FusionixAnalysis): WireAnalysis {
   return {
     consensus: a.consensus,
     contradictions: a.contradictions,
@@ -77,11 +77,11 @@ function toWireAnalysis(a: FusionAnalysis): WireAnalysis {
   };
 }
 
-export function toChatCompletion(result: FusionRunResult): ChatCompletionResponse {
-  // Bypass (§6.7): panel/analysis are absent, and the fusion extras are limited
+export function toChatCompletion(result: FusionixRunResult): ChatCompletionResponse {
+  // Bypass (§6.7): panel/analysis are absent, and the fusionix extras are limited
   // to run_id, duration_ms and web. Deliberation runs carry the full extras.
   const bypass = !result.panel && !result.analysis;
-  const fusion: FusionExtrasWire = bypass
+  const fusionix: FusionixExtrasWire = bypass
     ? { run_id: result.runId, duration_ms: result.durationMs, web: result.web }
     : {
         run_id: result.runId,
@@ -90,16 +90,16 @@ export function toChatCompletion(result: FusionRunResult): ChatCompletionRespons
         web: result.web,
         max_tool_calls_enforced: result.maxToolCallsEnforced,
       };
-  if (result.panel) fusion.panel = toWirePanel(result.panel);
-  if (result.analysis) fusion.analysis = toWireAnalysis(result.analysis);
+  if (result.panel) fusionix.panel = toWirePanel(result.panel);
+  if (result.analysis) fusionix.analysis = toWireAnalysis(result.analysis);
 
   return {
     id: result.runId,
     object: "chat.completion",
     created: result.created,
-    model: "fusion",
+    model: "fusionix",
     choices: [{ index: 0, message: { role: "assistant", content: result.answer }, finish_reason: "stop" }],
     usage: result.usage,
-    fusion,
+    fusionix,
   };
 }

@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { renderMarkdown, renderText, renderJson, renderExtras } from "../src/format.ts";
-import type { FusionRunResult } from "@ikangai/fusion-core";
+import type { FusionixRunResult } from "@ikangai/fusionix-core";
 
-function result(overrides: Partial<FusionRunResult> = {}): FusionRunResult {
+function result(overrides: Partial<FusionixRunResult> = {}): FusionixRunResult {
   return {
-    runId: "fusion-run-1",
+    runId: "fusionix-run-1",
     answer: "The answer is 42.",
     model: "anthropic/claude-opus-4.8",
     panel: [
@@ -34,8 +34,8 @@ test("renderJson emits the OpenAI-compatible chat.completion shape", () => {
   const parsed = JSON.parse(renderJson(result()));
   assert.equal(parsed.object, "chat.completion");
   assert.equal(parsed.choices[0].message.content, "The answer is 42.");
-  assert.equal(parsed.fusion.cost_usd, 0.1234);
-  assert.equal(parsed.fusion.web, "used");
+  assert.equal(parsed.fusionix.cost_usd, 0.1234);
+  assert.equal(parsed.fusionix.web, "used");
 });
 
 test("renderMarkdown leads with the answer and includes a footer", () => {

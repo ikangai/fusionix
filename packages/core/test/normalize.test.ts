@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeRequest } from "../src/normalize.ts";
-import { isFusionError } from "../src/errors.ts";
-import type { FusionConfig, FusionChatCompletionRequest, ChatMessage } from "../src/types.ts";
+import { isFusionixError } from "../src/errors.ts";
+import type { FusionixConfig, FusionixChatCompletionRequest, ChatMessage } from "../src/types.ts";
 
-const config: FusionConfig = {
+const config: FusionixConfig = {
   gateway: "https://gw/api/v1",
   defaultPreset: "general-high",
   defaults: { maxToolCalls: 8, web: true },
@@ -28,10 +28,10 @@ const config: FusionConfig = {
 };
 
 const user: ChatMessage = { role: "user", content: "q" };
-const RID = { runId: "fusion-run-test" };
+const RID = { runId: "fusionix-run-test" };
 
-function req(obj: unknown): FusionChatCompletionRequest {
-  return obj as FusionChatCompletionRequest;
+function req(obj: unknown): FusionixChatCompletionRequest {
+  return obj as FusionixChatCompletionRequest;
 }
 
 function expectCode(fn: () => unknown, code: string): void {
@@ -39,15 +39,15 @@ function expectCode(fn: () => unknown, code: string): void {
     fn();
     assert.fail(`expected throw with code ${code}`);
   } catch (e) {
-    assert.ok(isFusionError(e), `expected FusionError, got ${String(e)}`);
+    assert.ok(isFusionixError(e), `expected FusionixError, got ${String(e)}`);
     assert.equal(e.code, code);
   }
 }
 
 // ---- resolution ----------------------------------------------------------
 
-test("default fusion request resolves to the default preset", () => {
-  const plan = normalizeRequest(req({ model: "fusion", messages: [user] }), config, RID);
+test("default fusionix request resolves to the default preset", () => {
+  const plan = normalizeRequest(req({ model: "fusionix", messages: [user] }), config, RID);
   assert.deepEqual(plan.panel, ["A", "B", "C"]);
   assert.equal(plan.judge, "J");
   assert.equal(plan.writer, "W");
@@ -58,18 +58,18 @@ test("default fusion request resolves to the default preset", () => {
   assert.equal(plan.judgeTemperature, 0.5);
   assert.equal(plan.writerTemperature, 0.5);
   assert.equal(plan.presetName, "general-high");
-  assert.equal(plan.runId, "fusion-run-test");
+  assert.equal(plan.runId, "fusionix-run-test");
 });
 
-test("implicit plugin: model 'fusion' with no plugins uses deployment defaults", () => {
-  const plan = normalizeRequest(req({ model: "fusion", messages: [user] }), config, RID);
+test("implicit plugin: model 'fusionix' with no plugins uses deployment defaults", () => {
+  const plan = normalizeRequest(req({ model: "fusionix", messages: [user] }), config, RID);
   assert.deepEqual(plan.panel, ["A", "B", "C"]);
   assert.equal(plan.judge, "J");
 });
 
 test("plugin.preset selects the preset and its system prompts", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "research-high" }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", preset: "research-high" }] }),
     config,
     RID,
   );
@@ -84,7 +84,7 @@ test("plugin.preset selects the preset and its system prompts", () => {
 
 test("analysis_models overrides the preset panel (§6.8)", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "research-high", analysis_models: ["X", "Y", "Z"] }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", preset: "research-high", analysis_models: ["X", "Y", "Z"] }] }),
     config,
     RID,
   );
@@ -94,7 +94,7 @@ test("analysis_models overrides the preset panel (§6.8)", () => {
 
 test("plugin.model overrides the judge", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", model: "OJ" }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", model: "OJ" }] }),
     config,
     RID,
   );
@@ -105,7 +105,7 @@ test("plugin.model overrides the judge", () => {
 
 test("concrete top-level model is the writer; plugin.model is the judge (§6.8 example)", () => {
   const plan = normalizeRequest(
-    req({ model: "anthropic/claude-x", messages: [user], plugins: [{ id: "fusion", model: "openai/gpt-y" }] }),
+    req({ model: "anthropic/claude-x", messages: [user], plugins: [{ id: "fusionix", model: "openai/gpt-y" }] }),
     config,
     RID,
   );
@@ -117,7 +117,7 @@ test("concrete top-level model is the writer; plugin.model is the judge (§6.8 e
 
 test("enabled:false bypasses with a concrete writer", () => {
   const plan = normalizeRequest(
-    req({ model: "openai/gpt-z", messages: [user], plugins: [{ id: "fusion", enabled: false }] }),
+    req({ model: "openai/gpt-z", messages: [user], plugins: [{ id: "fusionix", enabled: false }] }),
     config,
     RID,
   );
@@ -125,9 +125,9 @@ test("enabled:false bypasses with a concrete writer", () => {
   assert.equal(plan.writer, "openai/gpt-z");
 });
 
-test("enabled:false with model 'fusion' bypasses using the default writer", () => {
+test("enabled:false with model 'fusionix' bypasses using the default writer", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", enabled: false }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", enabled: false }] }),
     config,
     RID,
   );
@@ -137,7 +137,7 @@ test("enabled:false with model 'fusion' bypasses using the default writer", () =
 
 test("request temperature/max_tokens apply to the writer only", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], temperature: 0.9, max_tokens: 1000 }),
+    req({ model: "fusionix", messages: [user], temperature: 0.9, max_tokens: 1000 }),
     config,
     RID,
   );
@@ -149,7 +149,7 @@ test("request temperature/max_tokens apply to the writer only", () => {
 
 test("preset maxTokens applies to panel/judge; request max_tokens overrides writer only", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "research-high" }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", preset: "research-high" }] }),
     config,
     RID,
   );
@@ -158,7 +158,7 @@ test("preset maxTokens applies to panel/judge; request max_tokens overrides writ
   assert.equal(plan.writerMaxTokens, 2048);
 
   const overridden = normalizeRequest(
-    req({ model: "fusion", messages: [user], max_tokens: 500, plugins: [{ id: "fusion", preset: "research-high" }] }),
+    req({ model: "fusionix", messages: [user], max_tokens: 500, plugins: [{ id: "fusionix", preset: "research-high" }] }),
     config,
     RID,
   );
@@ -169,7 +169,7 @@ test("preset maxTokens applies to panel/judge; request max_tokens overrides writ
 
 test("plugin.max_tool_calls overrides the default", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", max_tool_calls: 3 }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", max_tool_calls: 3 }] }),
     config,
     RID,
   );
@@ -177,10 +177,10 @@ test("plugin.max_tool_calls overrides the default", () => {
 });
 
 test("webOverride forces web on/off regardless of preset", () => {
-  const off = normalizeRequest(req({ model: "fusion", messages: [user] }), config, { ...RID, webOverride: false });
+  const off = normalizeRequest(req({ model: "fusionix", messages: [user] }), config, { ...RID, webOverride: false });
   assert.equal(off.web, false);
   const onForCodeReview = normalizeRequest(
-    req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "code-review" }] }),
+    req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", preset: "code-review" }] }),
     config,
     { ...RID, webOverride: true },
   );
@@ -189,7 +189,7 @@ test("webOverride forces web on/off regardless of preset", () => {
 
 test("caller messages are preserved (developer folded) in the plan", () => {
   const plan = normalizeRequest(
-    req({ model: "fusion", messages: [{ role: "system", content: "S" }, { role: "developer", content: "D" }, user] }),
+    req({ model: "fusionix", messages: [{ role: "system", content: "S" }, { role: "developer", content: "D" }, user] }),
     config,
     RID,
   );
@@ -200,89 +200,89 @@ test("caller messages are preserved (developer folded) in the plan", () => {
 });
 
 test("runId is auto-generated when not supplied", () => {
-  const plan = normalizeRequest(req({ model: "fusion", messages: [user] }), config);
-  assert.match(plan.runId, /^fusion-run-/);
+  const plan = normalizeRequest(req({ model: "fusionix", messages: [user] }), config);
+  assert.match(plan.runId, /^fusionix-run-/);
 });
 
 // ---- validation ----------------------------------------------------------
 
 test("missing messages → invalid_request", () => {
-  expectCode(() => normalizeRequest(req({ model: "fusion" }), config, RID), "invalid_request");
+  expectCode(() => normalizeRequest(req({ model: "fusionix" }), config, RID), "invalid_request");
 });
 
 test("empty messages → invalid_request", () => {
-  expectCode(() => normalizeRequest(req({ model: "fusion", messages: [] }), config, RID), "invalid_request");
+  expectCode(() => normalizeRequest(req({ model: "fusionix", messages: [] }), config, RID), "invalid_request");
 });
 
 test("no user message → invalid_request", () => {
   expectCode(
-    () => normalizeRequest(req({ model: "fusion", messages: [{ role: "assistant", content: "x" }] }), config, RID),
+    () => normalizeRequest(req({ model: "fusionix", messages: [{ role: "assistant", content: "x" }] }), config, RID),
     "invalid_request",
   );
 });
 
 test("analysis_models present but empty → invalid_request", () => {
   expectCode(
-    () => normalizeRequest(req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", analysis_models: [] }] }), config, RID),
+    () => normalizeRequest(req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", analysis_models: [] }] }), config, RID),
     "invalid_request",
   );
 });
 
-test("more than one fusion plugin → invalid_request", () => {
+test("more than one fusionix plugin → invalid_request", () => {
   expectCode(
-    () => normalizeRequest(req({ model: "fusion", messages: [user], plugins: [{ id: "fusion" }, { id: "fusion" }] }), config, RID),
+    () => normalizeRequest(req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix" }, { id: "fusionix" }] }), config, RID),
     "invalid_request",
   );
 });
 
-test("concrete model with no fusion plugin → not_a_fusion_request", () => {
-  expectCode(() => normalizeRequest(req({ model: "openai/x", messages: [user] }), config, RID), "not_a_fusion_request");
+test("concrete model with no fusionix plugin → not_a_fusionix_request", () => {
+  expectCode(() => normalizeRequest(req({ model: "openai/x", messages: [user] }), config, RID), "not_a_fusionix_request");
 });
 
-test("concrete model with only a non-fusion plugin → not_a_fusion_request", () => {
+test("concrete model with only a non-fusionix plugin → not_a_fusionix_request", () => {
   expectCode(
     () => normalizeRequest(req({ model: "openai/x", messages: [user], plugins: [{ id: "web" }] }), config, RID),
-    "not_a_fusion_request",
+    "not_a_fusionix_request",
   );
 });
 
 test("max_tool_calls must be a positive integer", () => {
   for (const bad of [0, -1, 1.5, "3"]) {
     expectCode(
-      () => normalizeRequest(req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", max_tool_calls: bad }] }), config, RID),
+      () => normalizeRequest(req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", max_tool_calls: bad }] }), config, RID),
       "invalid_request",
     );
   }
 });
 
 test("stream must be a boolean", () => {
-  expectCode(() => normalizeRequest(req({ model: "fusion", messages: [user], stream: "yes" }), config, RID), "invalid_request");
+  expectCode(() => normalizeRequest(req({ model: "fusionix", messages: [user], stream: "yes" }), config, RID), "invalid_request");
 });
 
 test("unknown preset → invalid_request", () => {
   expectCode(
-    () => normalizeRequest(req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", preset: "nope" }] }), config, RID),
+    () => normalizeRequest(req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", preset: "nope" }] }), config, RID),
     "invalid_request",
   );
 });
 
 test("empty resolved panel (no preset, no analysis_models) → invalid_request", () => {
-  const bare: FusionConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
-  expectCode(() => normalizeRequest(req({ model: "fusion", messages: [user] }), bare, RID), "invalid_request");
+  const bare: FusionixConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
+  expectCode(() => normalizeRequest(req({ model: "fusionix", messages: [user] }), bare, RID), "invalid_request");
 });
 
 test("missing judge (panel provided, no preset) → invalid_request", () => {
-  const bare: FusionConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
+  const bare: FusionixConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
   expectCode(
-    () => normalizeRequest(req({ model: "fusion", messages: [user], plugins: [{ id: "fusion", analysis_models: ["X"] }] }), bare, RID),
+    () => normalizeRequest(req({ model: "fusionix", messages: [user], plugins: [{ id: "fusionix", analysis_models: ["X"] }] }), bare, RID),
     "invalid_request",
   );
 });
 
 test("bypass requires only a writer — empty panel is allowed", () => {
-  const bare: FusionConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
+  const bare: FusionixConfig = { gateway: "g", defaults: { maxToolCalls: 8, web: true }, presets: {} };
   const plan = normalizeRequest(
-    req({ model: "openai/x", messages: [user], plugins: [{ id: "fusion", enabled: false }] }),
+    req({ model: "openai/x", messages: [user], plugins: [{ id: "fusionix", enabled: false }] }),
     bare,
     RID,
   );

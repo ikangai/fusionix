@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { OpenRouterGateway } from "../src/gateway/openrouter.ts";
 import { applyWeb } from "../src/gateway/web.ts";
-import { isFusionError } from "../src/errors.ts";
+import { isFusionixError } from "../src/errors.ts";
 
 interface FakeResult {
   status?: number;
@@ -65,15 +65,15 @@ test("chat() sends OpenRouter attribution headers only when configured", async (
     apiKey: "K",
     baseUrl: "https://gw/api/v1",
     fetch: withAttr.fn,
-    referer: "https://fusion.ikangai.com",
-    title: "Fusion",
+    referer: "https://fusionix.ikangai.com",
+    title: "Fusionix",
     categories: "cli-agent",
   });
   await gw1.chat({ model: "m", messages: [{ role: "user", content: "q" }] });
   const h1 = new Headers(withAttr.calls[0]!.init.headers);
-  assert.equal(h1.get("http-referer"), "https://fusion.ikangai.com");
-  assert.equal(h1.get("x-openrouter-title"), "Fusion");
-  assert.equal(h1.get("x-title"), "Fusion");
+  assert.equal(h1.get("http-referer"), "https://fusionix.ikangai.com");
+  assert.equal(h1.get("x-openrouter-title"), "Fusionix");
+  assert.equal(h1.get("x-title"), "Fusionix");
   assert.equal(h1.get("x-openrouter-categories"), "cli-agent");
 
   const noAttr = fakeFetch(() => ({ body: { choices: [{ message: { content: "x" } }] } }));
@@ -115,7 +115,7 @@ test("chat() maps a non-2xx response to gateway_error (502, no key state leaked)
   const gw = new OpenRouterGateway({ apiKey: "K", baseUrl: "https://gw/api/v1", fetch: fn });
   await assert.rejects(
     () => gw.chat({ model: "m", messages: [{ role: "user", content: "q" }] }),
-    (err: unknown) => isFusionError(err) && err.code === "gateway_error" && err.httpStatus === 502,
+    (err: unknown) => isFusionixError(err) && err.code === "gateway_error" && err.httpStatus === 502,
   );
 });
 

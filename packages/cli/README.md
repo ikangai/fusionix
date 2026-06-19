@@ -1,15 +1,15 @@
-# @ikangai/fusion-cli
+# @ikangai/fusionix-cli
 
-The `fusion` command — run multi-model deliberation (panel → judge → writer) from the terminal.
+The `fusionix` command — run multi-model deliberation (panel → judge → writer) from the terminal.
 
 In Phase 1 the CLI runs in **`--local`** mode, calling the gateway directly with your own `OPENROUTER_API_KEY`. The hosted default arrives in Phase 2.
 
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 
-fusion "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-high
-fusion "Review this architecture" --local --preset architecture-review --show-analysis
-cat spec.md | fusion --local --preset research-high --format json
+fusionix "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-high
+fusionix "Review this architecture" --local --preset architecture-review --show-analysis
+cat spec.md | fusionix --local --preset research-high --format json
 ```
 
 ## Options
@@ -40,7 +40,7 @@ Exit codes: `0` success · `1` runtime/gateway error or missing key · `2` usage
 
 ```bash
 npm install && npm run build
-cd packages/cli && npm link   # puts `fusion` on PATH
+cd packages/cli && npm link   # puts `fusionix` on PATH
 ```
 
 See the [repository README](../../README.md) for the full picture.

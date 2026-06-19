@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runWriter } from "../src/pipeline/writer.ts";
-import { isFusionError } from "../src/errors.ts";
+import { isFusionixError } from "../src/errors.ts";
 import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
-import type { ExecutionPlan, FusionAnalysis, GatewayCallResult } from "../src/types.ts";
+import type { ExecutionPlan, FusionixAnalysis, GatewayCallResult } from "../src/types.ts";
 
 function makePlan(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
   return {
@@ -19,7 +19,7 @@ function makePlan(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {
   };
 }
 
-const analysis: FusionAnalysis = {
+const analysis: FusionixAnalysis = {
   consensus: ["c"],
   contradictions: [],
   partialCoverage: [],
@@ -73,7 +73,7 @@ test("empty writer output → writer_failed", async () => {
   const { gateway } = fakeGateway(() => ({ content: "   " }));
   await assert.rejects(
     () => runWriter(makePlan(), "q", analysis, { gateway }),
-    (err: unknown) => isFusionError(err) && err.code === "writer_failed" && err.httpStatus === 502,
+    (err: unknown) => isFusionixError(err) && err.code === "writer_failed" && err.httpStatus === 502,
   );
 });
 
@@ -83,7 +83,7 @@ test("a thrown writer call → writer_failed", async () => {
   });
   await assert.rejects(
     () => runWriter(makePlan(), "q", analysis, { gateway }),
-    (err: unknown) => isFusionError(err) && err.code === "writer_failed",
+    (err: unknown) => isFusionixError(err) && err.code === "writer_failed",
   );
 });
 

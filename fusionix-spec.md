@@ -1,16 +1,16 @@
-# Fusion — OpenRouter-Shaped Multi-Model Deliberation Engine
+# Fusionix — OpenRouter-Shaped Multi-Model Deliberation Engine
 
 **Implementation specification for Claude Code**
 Status: v0.8 — FROZEN (implement Phase 1 only)
 Owner: IKANGAI
-Product domain: fusion.ikangai.com
-API base: https://fusion.ikangai.com/api
+Product domain: fusionix.ikangai.com
+API base: https://fusionix.ikangai.com/api
 
 ---
 
 ## 0. Product idea
 
-Fusion is a small hosted-and-local tool that implements OpenRouter-style multi-model deliberation from scratch.
+Fusionix is a small hosted-and-local tool that implements OpenRouter-style multi-model deliberation from scratch.
 
 It accepts a prompt, sends it to several models in parallel, asks a judge model to compare the answers, and asks a final writer model to produce one synthesized response.
 
@@ -40,28 +40,28 @@ This is the whole product. No debate rounds, no critic judge, no backend matrix 
 
 Four surfaces over one shared core:
 
-1. **CLI** — `fusion "question here"`
-2. **SDK** — `import { fuse } from "@ikangai/fusion"; const result = await fuse("question here");`
+1. **CLI** — `fusionix "question here"`
+2. **SDK** — `import { fuse } from "@ikangai/fusionix"; const result = await fuse("question here");`
 3. **Claude skill** — invokes the hosted API or CLI for hard questions.
-4. **Hosted Web API** — `POST https://fusion.ikangai.com/api/v1/chat/completions`
+4. **Hosted Web API** — `POST https://fusionix.ikangai.com/api/v1/chat/completions`
 
-Public landing page: `https://fusion.ikangai.com`, linking to API docs, CLI install, SDK docs, and skill install.
+Public landing page: `https://fusionix.ikangai.com`, linking to API docs, CLI install, SDK docs, and skill install.
 
 ---
 
 ## 3. Compatibility goal
 
-Fusion is **OpenRouter-shaped, not OpenRouter-dependent.** It accepts a request that looks like OpenRouter Fusion but runs our own pipeline:
+Fusionix is **OpenRouter-shaped, not OpenRouter-dependent.** It accepts a request that looks like OpenRouter Fusion but runs our own pipeline:
 
 ```jsonc
 {
-  "model": "fusion",
+  "model": "fusionix",
   "messages": [
     { "role": "user", "content": "What are the strongest arguments for and against carbon taxes?" }
   ],
   "plugins": [
     {
-      "id": "fusion",
+      "id": "fusionix",
       // Illustrative slugs only — use valid gateway model IDs (§4).
       "analysis_models": [
         "anthropic/claude-opus-latest",
@@ -80,15 +80,15 @@ Mapping (these are **our** fields; we own the surface):
 
 | Request field | Meaning in our implementation |
 |---|---|
-| `model` (top-level) | Final **writer** model. If `"fusion"`, use the default writer. When deliberation is enabled and `model` is a concrete slug (not `"fusion"`), it is the writer; the plugin `model` remains the judge. |
+| `model` (top-level) | Final **writer** model. If `"fusionix"`, use the default writer. When deliberation is enabled and `model` is a concrete slug (not `"fusionix"`), it is the writer; the plugin `model` remains the judge. |
 | `messages` | User/system conversation input (§14.0). |
-| `plugins[].id = "fusion"` | Enables deliberation config. |
+| `plugins[].id = "fusionix"` | Enables deliberation config. |
 | `analysis_models` | Panel models. |
 | `model` inside plugin | **Judge** model. |
 | `max_tool_calls` | Accepted for surface compatibility; **advisory** in v1 (§15). |
 | `enabled` | If `false`, bypass deliberation and run a single model call (§6.7). |
 
-So `{"model": "anthropic/claude-...", "plugins": [{"id": "fusion", "model": "openai/gpt-..."}]}` means: judge with OpenAI, write with Claude. Full resolution and the deliberation trigger are in §6.8. For v1, support only one Fusion plugin per request. The OpenAI-compatibility boundary is in §6.4.
+So `{"model": "anthropic/claude-...", "plugins": [{"id": "fusionix", "model": "openai/gpt-..."}]}` means: judge with OpenAI, write with Claude. Full resolution and the deliberation trigger are in §6.8. For v1, support only one Fusionix plugin per request. The OpenAI-compatibility boundary is in §6.4.
 
 ---
 
@@ -98,12 +98,12 @@ If the caller sends only:
 
 ```json
 {
-  "model": "fusion",
+  "model": "fusionix",
   "messages": [{ "role": "user", "content": "Compare ridge, lasso, and elastic-net regression." }]
 }
 ```
 
-Fusion uses built-in defaults:
+Fusionix uses built-in defaults:
 
 ```ts
 {
@@ -134,9 +134,9 @@ architecture-review
 
 ```json
 {
-  "model": "fusion",
+  "model": "fusionix",
   "messages": [{ "role": "user", "content": "Review this architecture." }],
-  "plugins": [{ "id": "fusion", "preset": "architecture-review" }]
+  "plugins": [{ "id": "fusionix", "preset": "architecture-review" }]
 }
 ```
 
@@ -147,7 +147,7 @@ Presets are a primary differentiator (§12): a generic panel is commodity; prese
 ### 5.1 Preset schema
 
 ```ts
-interface FusionPreset {
+interface FusionixPreset {
   name: string;
   description: string;
   panel: string[];
@@ -188,7 +188,7 @@ Preset definitions themselves use placeholder/configured model slugs, populated 
 ### 6.1 Endpoint
 
 ```text
-POST https://fusion.ikangai.com/api/v1/chat/completions
+POST https://fusionix.ikangai.com/api/v1/chat/completions
 ```
 
 Intentionally OpenAI/OpenRouter-shaped.
@@ -196,17 +196,17 @@ Intentionally OpenAI/OpenRouter-shaped.
 ### 6.2 Request
 
 ```ts
-interface FusionChatCompletionRequest {
+interface FusionixChatCompletionRequest {
   model: string;
   messages: ChatMessage[];
-  plugins?: FusionPlugin[];
+  plugins?: FusionixPlugin[];
   temperature?: number;   // writer only (§6.8)
   max_tokens?: number;    // writer only (§6.8)
   stream?: boolean;
 }
 
-interface FusionPlugin {
-  id: "fusion";
+interface FusionixPlugin {
+  id: "fusionix";
   preset?: string;
   analysis_models?: string[];
   model?: string;          // judge
@@ -217,14 +217,14 @@ interface FusionPlugin {
 
 ### 6.3 Response (non-streaming)
 
-OpenAI-compatible, with a non-standard `fusion` field for the extras:
+OpenAI-compatible, with a non-standard `fusionix` field for the extras:
 
 ```json
 {
-  "id": "fusion-run-...",
+  "id": "fusionix-run-...",
   "object": "chat.completion",
   "created": 1730000000,
-  "model": "fusion",
+  "model": "fusionix",
   "choices": [
     {
       "index": 0,
@@ -233,8 +233,8 @@ OpenAI-compatible, with a non-standard `fusion` field for the extras:
     }
   ],
   "usage": { "prompt_tokens": 1234, "completion_tokens": 567, "total_tokens": 1801 },
-  "fusion": {
-    "run_id": "fusion-run-...",
+  "fusionix": {
+    "run_id": "fusionix-run-...",
     "panel": [
       {
         "model": "anthropic/claude-opus-latest",
@@ -260,16 +260,16 @@ OpenAI-compatible, with a non-standard `fusion` field for the extras:
 }
 ```
 
-`choices[0].message.content` is always the final answer. `fusion.panel[]` is returned **in resolved panel order** (§6.8), not completion order; each entry carries the parsed answer plus assumptions/risks/citations when present. **Failed panel members remain in `fusion.panel` in their original position with `{ model, error }` and no `answer`.** If a panel model returned text that could not be parsed as JSON, `answer` holds the raw text (§14). `cost_usd` may be `null` when the gateway reports no cost (§8). `web` is `"used" | "off" | "unsupported"`. `max_tool_calls_enforced` reports whether the gateway mechanism honored `max_tool_calls` (§15).
+`choices[0].message.content` is always the final answer. `fusionix.panel[]` is returned **in resolved panel order** (§6.8), not completion order; each entry carries the parsed answer plus assumptions/risks/citations when present. **Failed panel members remain in `fusionix.panel` in their original position with `{ model, error }` and no `answer`.** If a panel model returned text that could not be parsed as JSON, `answer` holds the raw text (§14). `cost_usd` may be `null` when the gateway reports no cost (§8). `web` is `"used" | "off" | "unsupported"`. `max_tool_calls_enforced` reports whether the gateway mechanism honored `max_tool_calls` (§15).
 
 v1 omits `system_fingerprint`. If a client needs the closer OpenAI shape it may be added later as a nullable field (`"system_fingerprint": null`).
 
 ### 6.4 OpenAI-compatibility boundary
 
-- **Drop-in:** a stock OpenAI client pointed at the base URL with `model: "fusion"` and `messages` gets the final answer in `choices[0].message.content`. Streaming of that answer works (§6.5).
-- **Not drop-in:** `plugins` is not an OpenAI concept — OpenAI SDKs pass it via `extra_body` (or equivalent). The `fusion` response field is non-standard and is ignored by stock OpenAI SDKs, so panel answers and analysis are not reachable through a vanilla client. To get the extras, use the Fusion SDK (§9) or read the raw JSON.
+- **Drop-in:** a stock OpenAI client pointed at the base URL with `model: "fusionix"` and `messages` gets the final answer in `choices[0].message.content`. Streaming of that answer works (§6.5).
+- **Not drop-in:** `plugins` is not an OpenAI concept — OpenAI SDKs pass it via `extra_body` (or equivalent). The `fusionix` response field is non-standard and is ignored by stock OpenAI SDKs, so panel answers and analysis are not reachable through a vanilla client. To get the extras, use the Fusionix SDK (§9) or read the raw JSON.
 
-Document this as **"OpenAI-compatible for the answer, Fusion-shaped for the extras."** Put that line in the landing page and docs.
+Document this as **"OpenAI-compatible for the answer, Fusionix-shaped for the extras."** Put that line in the landing page and docs.
 
 ### 6.5 Streaming contract
 
@@ -279,16 +279,16 @@ When `stream: true`:
 - Immediately before the terminal `data: [DONE]`, emit one non-standard event carrying the extras:
 
 ```text
-event: fusion
+event: fusionix
 data: { "run_id": "...", "panel": [...], "analysis": {...}, "cost_usd": 0.12, "duration_ms": 12000, "web": "used", "max_tool_calls_enforced": false }
 ```
 
-The Fusion SDK reads this event. Raw OpenAI SDK users should **not** rely on receiving it — some streaming abstractions drop unknown SSE events. (If we control the SDK parser, the extras may alternatively ride in the last normal chunk under an extension field; the custom event is sufficient for v1.)
+The Fusionix SDK reads this event. Raw OpenAI SDK users should **not** rely on receiving it — some streaming abstractions drop unknown SSE events. (If we control the SDK parser, the extras may alternatively ride in the last normal chunk under an extension field; the custom event is sufficient for v1.)
 
 - Optional progress events let clients show status during the silent panel/judge phases:
 
 ```text
-event: fusion.progress
+event: fusionix.progress
 data: { "stage": "panel" | "judge" | "writer" }
 ```
 
@@ -302,9 +302,9 @@ Errors use an OpenAI-shaped object:
 {
   "error": {
     "message": "All panel models failed.",
-    "type": "fusion_error",
+    "type": "fusionix_error",
     "code": "all_panel_failed",
-    "run_id": "fusion-run-..."
+    "run_id": "fusionix-run-..."
   }
 }
 ```
@@ -314,8 +314,8 @@ HTTP mapping:
 | Situation | HTTP | code |
 |---|---|---|
 | Invalid request shape (see §6.8 list) | 400 | `invalid_request` |
-| Concrete `model` with no fusion plugin (§6.8) | 400 | `not_a_fusion_request` |
-| Missing/invalid Fusion API key | 401 | `unauthorized` |
+| Concrete `model` with no fusionix plugin (§6.8) | 400 | `not_a_fusionix_request` |
+| Missing/invalid Fusionix API key | 401 | `unauthorized` |
 | Prompt too large | 413 | `prompt_too_large` |
 | Per-key concurrency / rate / usage limit exceeded | 429 | `limit_exceeded` |
 | All panel models failed | 502 | `all_panel_failed` |
@@ -328,11 +328,11 @@ Gateway authentication failure maps to **502**, not 401, so the response never r
 
 ### 6.7 Single-model bypass (`enabled: false`)
 
-When the Fusion plugin has `enabled: false`:
+When the Fusionix plugin has `enabled: false`:
 
 - Use the top-level `model` as the single model.
-- If the top-level `model` is `"fusion"`, use the resolved/default writer model.
-- Return the `fusion` extras with only `run_id`, `duration_ms`, and `web: "off"` (unless web was used); omit `panel` and `analysis`.
+- If the top-level `model` is `"fusionix"`, use the resolved/default writer model.
+- Return the `fusionix` extras with only `run_id`, `duration_ms`, and `web: "off"` (unless web was used); omit `panel` and `analysis`.
 
 This behavior lives in core, so CLI and SDK local mode behave identically.
 
@@ -340,19 +340,19 @@ This behavior lives in core, so CLI and SDK local mode behave identically.
 
 Core resolves a single execution plan before any model call, so behavior is deterministic across CLI, SDK, and hosted API.
 
-**Trigger.** Deliberation runs when the top-level `model` is `"fusion"`, **or** when `plugins[0].id === "fusion"` and its `enabled` is not `false`. A request with a concrete `model` and **no** fusion plugin is not a Fusion request: return `400 not_a_fusion_request`. v1 is not a general single-model proxy (§19). (Relaxing this to passthrough later is a one-line change.)
+**Trigger.** Deliberation runs when the top-level `model` is `"fusionix"`, **or** when `plugins[0].id === "fusionix"` and its `enabled` is not `false`. A request with a concrete `model` and **no** fusionix plugin is not a Fusionix request: return `400 not_a_fusionix_request`. v1 is not a general single-model proxy (§19). (Relaxing this to passthrough later is a one-line change.)
 
-**Implicit plugin.** If `model === "fusion"` and no `plugins` array is present, synthesize an implicit Fusion plugin from deployment defaults (§4). All `plugins[0]` references below then operate on that implicit plugin.
+**Implicit plugin.** If `model === "fusionix"` and no `plugins` array is present, synthesize an implicit Fusionix plugin from deployment defaults (§4). All `plugins[0]` references below then operate on that implicit plugin.
 
 **Resolution order:**
 
 1. Load deployment defaults.
-2. Apply the default preset from config (`FUSION_DEFAULT_PRESET`), if any.
+2. Apply the default preset from config (`FUSIONIX_DEFAULT_PRESET`), if any.
 3. Apply `plugins[0].preset`, if present.
 4. Apply explicit request overrides:
    - `plugins[0].analysis_models` overrides the preset panel.
    - `plugins[0].model` overrides the judge model.
-   - top-level `model` overrides the writer model, unless it is `"fusion"` (then use the resolved/default writer).
+   - top-level `model` overrides the writer model, unless it is `"fusionix"` (then use the resolved/default writer).
    - `max_tokens` applies to the **writer call only**.
    - `temperature` applies to the **writer call only**.
    - panel and judge use the preset/config `temperature`/`maxTokens` defaults; per-stage request controls are a future addition.
@@ -360,16 +360,16 @@ Core resolves a single execution plan before any model call, so behavior is dete
 6. **Validate** before any gateway call. Reject with `400 invalid_request` when:
    - `messages` is missing or empty
    - no user message can be found
-   - more than one Fusion plugin is present
+   - more than one Fusionix plugin is present
    - `analysis_models` is present but empty
    - the resolved panel is empty, or the resolved judge or writer is missing
    - `max_tool_calls` is provided but is not a positive integer
    - `stream` is provided but is not a boolean
 
    Then enforce per-key limits (413 prompt size, 429 concurrency/rate). Model **presence** (non-empty resolved panel/judge/writer) is always validated here; model **existence** on the gateway is validated only best-effort (§8.2) and never blocks gateways without a `/models` endpoint.
-7. Execute. Return `fusion.panel` in resolved panel order; failed panel members remain in position with `{ model, error }` and no `answer`.
+7. Execute. Return `fusionix.panel` in resolved panel order; failed panel members remain in position with `{ model, error }` and no `answer`.
 
-So `{"model": "anthropic/claude-...", "plugins": [{"id": "fusion", "model": "openai/gpt-..."}]}` resolves to: judge with OpenAI, write with Claude, panel from the default/preset.
+So `{"model": "anthropic/claude-...", "plugins": [{"id": "fusionix", "model": "openai/gpt-..."}]}` resolves to: judge with OpenAI, write with Claude, panel from the default/preset.
 
 ### 6.9 Health
 
@@ -390,7 +390,7 @@ This section is the difference between a product and a way to lose money. The pi
 ### 7.1 Hosted API authentication
 
 ```http
-Authorization: Bearer <FUSION_API_KEY>
+Authorization: Bearer <FUSIONIX_API_KEY>
 ```
 
 A development mode may disable auth for local testing only. (`GET /api/v1/presets` and `GET /api/health` are public; §5.2, §6.9.)
@@ -399,10 +399,10 @@ A development mode may disable auth for local testing only. (`GET /api/v1/preset
 
 Two modes; v1 ships the first.
 
-- **Bring-your-own gateway key (default, v1).** Each Fusion account stores its own gateway credential (e.g. an OpenRouter key), encrypted at rest. `FUSION_API_KEY` authenticates the caller; model calls are paid by that account's gateway key. The hosted service fronts no model spend, so there is no operator *financial* exposure. This also fits the municipal/enterprise "bring your own contract" pattern.
+- **Bring-your-own gateway key (default, v1).** Each Fusionix account stores its own gateway credential (e.g. an OpenRouter key), encrypted at rest. `FUSIONIX_API_KEY` authenticates the caller; model calls are paid by that account's gateway key. The hosted service fronts no model spend, so there is no operator *financial* exposure. This also fits the municipal/enterprise "bring your own contract" pattern.
 
-  BYO does **not** mean "no risk" — storing a customer's gateway key is a real trust boundary, which is exactly why the storage design in §7.6 (HMAC-hashed Fusion keys, AEAD-encrypted gateway secrets) is mandatory, not optional. Communicate the boundary honestly on the landing page (§12).
-- **Managed billing (later phase, non-goal for v1).** Fusion uses an operator gateway key and bills a margin via metering. Requires a real billing system; deferred (§19).
+  BYO does **not** mean "no risk" — storing a customer's gateway key is a real trust boundary, which is exactly why the storage design in §7.6 (HMAC-hashed Fusionix keys, AEAD-encrypted gateway secrets) is mandatory, not optional. Communicate the boundary honestly on the landing page (§12).
+- **Managed billing (later phase, non-goal for v1).** Fusionix uses an operator gateway key and bills a margin via metering. Requires a real billing system; deferred (§19).
 
 ### 7.3 Per-key limits (enforced server-side)
 
@@ -417,7 +417,7 @@ Recommended v1 defaults:
 }
 ```
 
-Reject requests exceeding these before any model call (§6.6: 413 for prompt size, 429 for concurrency/rate). Limits are per Fusion API key (`limits_json`) and may be raised per account later.
+Reject requests exceeding these before any model call (§6.6: 413 for prompt size, 429 for concurrency/rate). Limits are per Fusionix API key (`limits_json`) and may be raised per account later.
 
 ### 7.4 Spend caps
 
@@ -425,20 +425,20 @@ Optional per-key daily/monthly USD caps, computed from gateway-reported cost (§
 
 ### 7.5 Credentials per surface
 
-- **Local** (CLI `--local`, SDK `fuseLocal`, core directly): uses the user's own `OPENROUTER_API_KEY` and calls the gateway directly. No Fusion service, no `FUSION_API_KEY`, no hosted-service exposure.
-- **Hosted** (CLI default, SDK `fuse`, skill, raw API): `FUSION_API_KEY` authenticates; the account's stored gateway key pays; per-key limits and caps apply.
+- **Local** (CLI `--local`, SDK `fuseLocal`, core directly): uses the user's own `OPENROUTER_API_KEY` and calls the gateway directly. No Fusionix service, no `FUSIONIX_API_KEY`, no hosted-service exposure.
+- **Hosted** (CLI default, SDK `fuse`, skill, raw API): `FUSIONIX_API_KEY` authenticates; the account's stored gateway key pays; per-key limits and caps apply.
 
 ### 7.6 Gateway key storage (v1)
 
-Store one encrypted gateway credential per Fusion API key. Minimum schema:
+Store one encrypted gateway credential per Fusionix API key. Minimum schema:
 
-- `fusion_api_keys`: `id`, `key_hash`, `name`, `limits_json`, `disabled_at`, `created_at`
+- `fusionix_api_keys`: `id`, `key_hash`, `name`, `limits_json`, `disabled_at`, `created_at`
 - `gateway_credentials`: `api_key_id`, `provider`, `encrypted_secret`, `created_at`, `updated_at`
 
 Implementation notes:
 
-- Fusion API keys are high-entropy random tokens. Hash them with **HMAC-SHA256 using a server-side secret (pepper)** from env — not argon2/bcrypt. Slow password hashes defend low-entropy human passwords; they add latency with no benefit for random API tokens.
-- Encrypt gateway secrets with application-level AEAD (AES-256-GCM or libsodium secretbox) using a key from `FUSION_ENCRYPTION_KEY`.
+- Fusionix API keys are high-entropy random tokens. Hash them with **HMAC-SHA256 using a server-side secret (pepper)** from env — not argon2/bcrypt. Slow password hashes defend low-entropy human passwords; they add latency with no benefit for random API tokens.
+- Encrypt gateway secrets with application-level AEAD (AES-256-GCM or libsodium secretbox) using a key from `FUSIONIX_ENCRYPTION_KEY`.
 - Never log or return a gateway secret after creation.
 - Provide admin-only scripts to create API keys and attach/update gateway credentials (§13.2).
 
@@ -452,7 +452,7 @@ A full provider-independent cost engine is a non-goal. A thin gateway-usage path
 
 ### 8.1 Actual cost
 
-On each model call, request usage accounting from the gateway. For OpenRouter, send `usage: { include: true }`; the response then includes token usage and cost. Sum cost across panel + judge + writer for `fusion.cost_usd`. If a call omits cost, optionally backfill from `GET {gateway}/generation?id={id}` (best-effort; never blocks). For gateways that report no cost, set `cost_usd: null`.
+On each model call, request usage accounting from the gateway. For OpenRouter, send `usage: { include: true }`; the response then includes token usage and cost. Sum cost across panel + judge + writer for `fusionix.cost_usd`. If a call omits cost, optionally backfill from `GET {gateway}/generation?id={id}` (best-effort; never blocks). For gateways that report no cost, set `cost_usd: null`.
 
 ### 8.2 Estimation and the models endpoint
 
@@ -468,27 +468,27 @@ Track and expose total token usage, per-model usage where available, estimated c
 
 ## 9. SDK
 
-Package: `@ikangai/fusion`. The default import is a **hosted API client**; local orchestration is a separate subpath export, so the default SDK stays light and does not pull in orchestration/retry/provider code.
+Package: `@ikangai/fusionix`. The default import is a **hosted API client**; local orchestration is a separate subpath export, so the default SDK stays light and does not pull in orchestration/retry/provider code.
 
 ```ts
-import { fuse } from "@ikangai/fusion";          // hosted API client
-import { fuseLocal } from "@ikangai/fusion/local"; // local orchestration (uses core)
+import { fuse } from "@ikangai/fusionix";          // hosted API client
+import { fuseLocal } from "@ikangai/fusionix/local"; // local orchestration (uses core)
 ```
 
 ### 9.1 Hosted use
 
 ```ts
-import { fuse } from "@ikangai/fusion";
+import { fuse } from "@ikangai/fusionix";
 const result = await fuse("Compare SQLite and Postgres for agent coordination.");
 console.log(result.answer);
 ```
 
-`fuse()` calls the hosted API and requires `FUSION_API_KEY`. Make this and the API URL obvious in the SDK docs.
+`fuse()` calls the hosted API and requires `FUSIONIX_API_KEY`. Make this and the API URL obvious in the SDK docs.
 
 ### 9.2 Local use
 
 ```ts
-import { fuseLocal } from "@ikangai/fusion/local";
+import { fuseLocal } from "@ikangai/fusionix/local";
 const result = await fuseLocal("Review this code architecture.", {
   preset: "architecture-review",
   panel:  ["<configured-claude-model>", "<configured-openai-model>", "<configured-gemini-model>"],
@@ -502,9 +502,9 @@ const result = await fuseLocal("Review this code architecture.", {
 ### 9.3 SDK result
 
 ```ts
-interface FusionResult {
+interface FusionixResult {
   answer: string;
-  analysis?: FusionAnalysis;   // omitted in bypass mode (§6.7)
+  analysis?: FusionixAnalysis;   // omitted in bypass mode (§6.7)
   panel?: PanelResponse[];     // omitted in bypass mode (§6.7)
   usage?: Usage;
   costUsd?: number;            // undefined when the gateway reports no cost
@@ -527,7 +527,7 @@ interface PanelResponse {
   error?: { message: string };    // present if this panel model failed
 }
 
-interface FusionAnalysis {
+interface FusionixAnalysis {
   consensus: string[];
   contradictions: { topic: string; stances: { model: string; stance: string }[] }[];
   partialCoverage: { models: string[]; point: string }[];
@@ -537,22 +537,22 @@ interface FusionAnalysis {
 }
 ```
 
-(The SDK uses camelCase; the wire `fusion` object uses snake_case as in §6.3.)
+(The SDK uses camelCase; the wire `fusionix` object uses snake_case as in §6.3.)
 
 ---
 
 ## 10. CLI
 
 ```text
-fusion [prompt] [options]
+fusionix [prompt] [options]
 ```
 
 ### 10.1 Examples
 
 ```bash
-fusion "Compare SQLite and Postgres for lightweight agent coordination."
-fusion "Review this architecture" --preset architecture-review
-cat spec.md | fusion --preset research-high
+fusionix "Compare SQLite and Postgres for lightweight agent coordination."
+fusionix "Review this architecture" --preset architecture-review
+cat spec.md | fusionix --preset research-high
 ```
 
 ### 10.2 Options
@@ -566,7 +566,7 @@ cat spec.md | fusion --preset research-high
 --max-tool-calls <n>         Advisory in v1 (§15).
 --no-web                     Disable web search/fetch.
 --format <text|json|md>      Output format (default: md on TTY, json on pipe).
---api-url <url>              Default https://fusion.ikangai.com/api.
+--api-url <url>              Default https://fusionix.ikangai.com/api.
 --local                      Run local orchestration with OPENROUTER_API_KEY instead of the hosted API.
 --stream                     Stream the final answer.
 --show-analysis              Include judge analysis in md/text output.
@@ -576,24 +576,24 @@ cat spec.md | fusion --preset research-high
 --help
 ```
 
-Default behavior: without `--local`, call the hosted API (`FUSION_API_KEY`); with `--local`, run the pipeline locally (`OPENROUTER_API_KEY`). Default API URL `https://fusion.ikangai.com/api`; the CLI appends `/v1/chat/completions`.
+Default behavior: without `--local`, call the hosted API (`FUSIONIX_API_KEY`); with `--local`, run the pipeline locally (`OPENROUTER_API_KEY`). Default API URL `https://fusionix.ikangai.com/api`; the CLI appends `/v1/chat/completions`.
 
 ---
 
 ## 11. Claude skill
 
-Small by design. Its job: decide whether the question is worth deliberating; call Fusion; return the final answer; optionally summarize the analysis on request.
+Small by design. Its job: decide whether the question is worth deliberating; call Fusionix; return the final answer; optionally summarize the analysis on request.
 
-Use Fusion for: research questions, expert critique, architecture review, compare/contrast, ambiguous questions, high-stakes questions.
+Use Fusionix for: research questions, expert critique, architecture review, compare/contrast, ambiguous questions, high-stakes questions.
 
-Do not use Fusion for: simple factual questions, small rewrites, tactical coding questions, trivial summaries.
+Do not use Fusionix for: simple factual questions, small rewrites, tactical coding questions, trivial summaries.
 
 **Invocation order** (do not make CLI installation the default dependency):
 
-1. If `FUSION_API_KEY` is available, call the hosted API directly (`POST .../api/v1/chat/completions`).
-2. Else, if the `fusion` CLI is installed and configured, run it: `fusion "<prompt>" --preset general-high --format json`.
-3. Else, if `OPENROUTER_API_KEY` is present and the CLI exists, run local: `fusion "<prompt>" --local --preset general-high --format json`.
-4. Else, explain that Fusion is not configured and what the user needs to set.
+1. If `FUSIONIX_API_KEY` is available, call the hosted API directly (`POST .../api/v1/chat/completions`).
+2. Else, if the `fusionix` CLI is installed and configured, run it: `fusionix "<prompt>" --preset general-high --format json`.
+3. Else, if `OPENROUTER_API_KEY` is present and the CLI exists, run local: `fusionix "<prompt>" --local --preset general-high --format json`.
+4. Else, explain that Fusionix is not configured and what the user needs to set.
 
 Parse the result, use `.answer`, and summarize `consensus` / `contradictions` / `blind_spots` only when asked.
 
@@ -601,17 +601,17 @@ Parse the result, use `.answer`, and summarize `consensus` / `contradictions` / 
 
 ## 12. Landing page
 
-Domain: `https://fusion.ikangai.com`.
+Domain: `https://fusionix.ikangai.com`.
 
-Explain: what Fusion is; why panel + judge can help; when to use it and when not to; CLI/SDK/API/skill usage; pricing/usage cost; contact and IKANGAI branding. Set the latency expectation (§6.5). Use the line from §6.4 verbatim.
+Explain: what Fusionix is; why panel + judge can help; when to use it and when not to; CLI/SDK/API/skill usage; pricing/usage cost; contact and IKANGAI branding. Set the latency expectation (§6.5). Use the line from §6.4 verbatim.
 
 Positioning:
 
-> Fusion gives hard questions a second, third, and fourth opinion. It runs a panel of models, asks a judge to compare their answers, and gives you one synthesized result — available as an API, CLI, SDK, or Claude skill.
+> Fusionix gives hard questions a second, third, and fourth opinion. It runs a panel of models, asks a judge to compare their answers, and gives you one synthesized result — available as an API, CLI, SDK, or Claude skill.
 
 Be honest about the BYO trust boundary (§7.2) — do not imply "no risk because BYO." Use:
 
-> In hosted mode, Fusion stores your gateway key encrypted and uses it only to run your requests. In local mode, your gateway key never leaves your machine.
+> In hosted mode, Fusionix stores your gateway key encrypted and uses it only to run your requests. In local mode, your gateway key never leaves your machine.
 
 Where the value lives: the pipeline itself is commodity, so the differentiators are the packaging across four surfaces under one brand, EU/own-hosting for clients who will not route through a third party directly, and domain-tuned presets. Lead with those, not with "we run three models."
 
@@ -622,16 +622,16 @@ Where the value lives: the pipeline itself is commodity, so the differentiators 
 TypeScript monorepo.
 
 ```text
-fusion/
+fusionix/
 ├─ packages/
 │  ├─ core/        # request normalization, message handling, preset expansion, panel/judge/writer, cost tracking, result shaping
 │  ├─ cli/         # thin wrapper: hosted API or local core
 │  ├─ sdk/         # hosted client (default) + /local subpath (fuseLocal)
 │  ├─ api/         # hosted endpoints; auth + per-key limits + spend caps + key storage; uses core
-│  ├─ admin/       # fusion-admin CLI
+│  ├─ admin/       # fusionix-admin CLI
 │  └─ skill/
 ├─ apps/
-│  └─ landing/     # fusion.ikangai.com (Next.js, Astro, or static)
+│  └─ landing/     # fusionix.ikangai.com (Next.js, Astro, or static)
 ├─ docs/
 └─ examples/
 ```
@@ -644,15 +644,15 @@ Contains no web-server, CLI, or UI code: request normalization (§6.8), message 
 
 `api` hosts `POST /api/v1/chat/completions`, `GET /api/v1/presets`, `GET /api/health`. It owns authentication, per-key limits (§7.3), spend caps (§7.4), gateway key storage (§7.6), error mapping (§6.6), and BYO gateway-key handling. It calls the same core as CLI and SDK.
 
-`fusion-admin` provisions keys (BYO mode cannot work without it):
+`fusionix-admin` provisions keys (BYO mode cannot work without it):
 
 ```bash
-fusion-admin create-key --name "Client A"
-fusion-admin set-gateway-key --key-id <id> --provider openrouter
-fusion-admin disable-key --key-id <id>
+fusionix-admin create-key --name "Client A"
+fusionix-admin set-gateway-key --key-id <id> --provider openrouter
+fusionix-admin disable-key --key-id <id>
 ```
 
-`set-gateway-key` reads the secret from **stdin** or the `FUSION_GATEWAY_SECRET` env var — never a command-line flag, so it does not land in shell history or `ps` output.
+`set-gateway-key` reads the secret from **stdin** or the `FUSIONIX_GATEWAY_SECRET` env var — never a command-line flag, so it does not land in shell history or `ps` output.
 
 ### 13.3 Configuration
 
@@ -660,14 +660,14 @@ Environment:
 
 ```text
 OPENROUTER_API_KEY=...           # local mode / gateway calls
-FUSION_API_KEY=...               # hosted client auth (CLI/SDK)
-FUSION_ENCRYPTION_KEY=...        # AEAD key for stored gateway secrets (api package)
-FUSION_GATEWAY_SECRET=...        # used only by fusion-admin set-gateway-key (alternative to stdin)
-FUSION_DEFAULT_PRESET=general-high
-FUSION_DEFAULT_GATEWAY=https://openrouter.ai/api/v1
-FUSION_HTTP_REFERER=...          # optional OpenRouter attribution (§13.4)
-FUSION_APP_TITLE=...             # optional OpenRouter attribution (§13.4)
-FUSION_LOG_LEVEL=info
+FUSIONIX_API_KEY=...               # hosted client auth (CLI/SDK)
+FUSIONIX_ENCRYPTION_KEY=...        # AEAD key for stored gateway secrets (api package)
+FUSIONIX_GATEWAY_SECRET=...        # used only by fusionix-admin set-gateway-key (alternative to stdin)
+FUSIONIX_DEFAULT_PRESET=general-high
+FUSIONIX_DEFAULT_GATEWAY=https://openrouter.ai/api/v1
+FUSIONIX_HTTP_REFERER=...          # optional OpenRouter attribution (§13.4)
+FUSIONIX_APP_TITLE=...             # optional OpenRouter attribution (§13.4)
+FUSIONIX_LOG_LEVEL=info
 ```
 
 Local config file uses placeholder/configured slugs, populated per deployment:
@@ -692,8 +692,8 @@ A deployment may also supply a **local model registry / price table** here, used
 
 When the gateway is OpenRouter, the gateway client may send attribution headers so usage appears in OpenRouter's app rankings:
 
-- `HTTP-Referer: ${FUSION_HTTP_REFERER}`
-- `X-OpenRouter-Title: ${FUSION_APP_TITLE}` (`X-Title` is the legacy fallback)
+- `HTTP-Referer: ${FUSIONIX_HTTP_REFERER}`
+- `X-OpenRouter-Title: ${FUSIONIX_APP_TITLE}` (`X-Title` is the legacy fallback)
 
 Optionally also `X-OpenRouter-Categories` (e.g. `cli-agent`). These are sent only when configured and are never required for the pipeline to work.
 
@@ -775,12 +775,12 @@ A proper counted search/fetch loop can be added later (§19 non-goal for v1).
 
 ## 16. Logging
 
-Each run gets a `run_id`. Log: request timestamp, preset, panel models, judge model, writer model, duration, usage, cost, errors, whether web tools were used, and `max_tool_calls_enforced`. Never log gateway or Fusion API keys, or stored gateway secrets.
+Each run gets a `run_id`. Log: request timestamp, preset, panel models, judge model, writer model, duration, usage, cost, errors, whether web tools were used, and `max_tool_calls_enforced`. Never log gateway or Fusionix API keys, or stored gateway secrets.
 
 Optional full JSONL run log for the local CLI:
 
 ```bash
-fusion "question" --local --log run.jsonl
+fusionix "question" --local --log run.jsonl
 ```
 
 ---
@@ -808,18 +808,18 @@ Hosted responses use the §6.6 error object.
 ## 18. Implementation phases
 
 **Phase 1 — Core + local CLI.** Build the core pipeline (request normalization §6.8, message handling §14.0, single-model bypass §6.7) and the local CLI.
-Done when `fusion "hard question" --local --preset general-high` runs panel → judge → writer and returns an answer, with `cost_usd` populated from gateway usage (§8.1), panel returned in resolved order, caller system messages preserved, and panel/judge parse-failure rules behaving per §14. In Phase 1 the hosted API does not exist yet, so the CLI runs in `--local` mode; the hosted default in §10 applies from Phase 2 onward.
+Done when `fusionix "hard question" --local --preset general-high` runs panel → judge → writer and returns an answer, with `cost_usd` populated from gateway usage (§8.1), panel returned in resolved order, caller system messages preserved, and panel/judge parse-failure rules behaving per §14. In Phase 1 the hosted API does not exist yet, so the CLI runs in `--local` mode; the hosted default in §10 applies from Phase 2 onward.
 
-**Phase 2 — Hosted API.** Build `POST /api/v1/chat/completions`, `GET /api/v1/presets`, `GET /api/health`, **plus** authentication (§7.1), gateway key storage (§7.6), `fusion-admin` (`create-key`, `set-gateway-key`, `disable-key`), per-key limits (§7.3), the minimal cost path (§8), the request-validation list and error mapping (§6.6, §6.8), and the streaming contract (§6.5).
-Done when a key plus gateway credential can be provisioned via `fusion-admin`, `fusion "hard question"` runs end-to-end through `https://fusion.ikangai.com/api` with auth, returns the answer and `cost_usd`, rejects over-limit / non-Fusion / invalid requests with the right HTTP codes, `GET /api/health` returns the §6.9 shape, and `GET /api/v1/presets` returns redacted entries without auth.
+**Phase 2 — Hosted API.** Build `POST /api/v1/chat/completions`, `GET /api/v1/presets`, `GET /api/health`, **plus** authentication (§7.1), gateway key storage (§7.6), `fusionix-admin` (`create-key`, `set-gateway-key`, `disable-key`), per-key limits (§7.3), the minimal cost path (§8), the request-validation list and error mapping (§6.6, §6.8), and the streaming contract (§6.5).
+Done when a key plus gateway credential can be provisioned via `fusionix-admin`, `fusionix "hard question"` runs end-to-end through `https://fusionix.ikangai.com/api` with auth, returns the answer and `cost_usd`, rejects over-limit / non-Fusionix / invalid requests with the right HTTP codes, `GET /api/health` returns the §6.9 shape, and `GET /api/v1/presets` returns redacted entries without auth.
 
-**Phase 3 — SDK.** Build `@ikangai/fusion` (hosted client) and `@ikangai/fusion/local` (`fuseLocal`).
+**Phase 3 — SDK.** Build `@ikangai/fusionix` (hosted client) and `@ikangai/fusionix/local` (`fuseLocal`).
 Done when `await fuse("hard question")` works against the hosted API and `await fuseLocal("...")` works against the gateway directly.
 
 **Phase 4 — Claude skill.** Build a skill that follows the §11 invocation order.
-Done when Claude uses Fusion for a hard question and returns the final answer.
+Done when Claude uses Fusionix for a hard question and returns the final answer.
 
-**Phase 5 — Landing page.** Build `fusion.ikangai.com`.
+**Phase 5 — Landing page.** Build `fusionix.ikangai.com`.
 Done when it explains the product, sets latency expectations, uses the §6.4 line and the §12 BYO phrasing, and links to CLI, SDK, API, and skill docs.
 
 ---
@@ -833,7 +833,7 @@ Do not build these in v1:
 - MCP server
 - complex capability/backend matrix
 - offline rejudge
-- general single-model passthrough proxy (the endpoint is for deliberation; §6.8 returns `400 not_a_fusion_request` otherwise)
+- general single-model passthrough proxy (the endpoint is for deliberation; §6.8 returns `400 not_a_fusionix_request` otherwise)
 - **counted / multi-step web-search/fetch tool loop** (v1 uses gateway-native web only; §15)
 - **full provider-independent cost engine** (the thin gateway-usage path in §8 *is* in scope)
 - **managed/margin billing and metering** (BYO gateway key is the v1 model; §7.2)
@@ -848,7 +848,7 @@ These can come later if the product proves useful.
 
 ## 20. One-sentence framing
 
-Fusion gives hard questions multiple independent model perspectives, compares them with a judge, and returns one synthesized answer — available as an API, CLI, SDK, and Claude skill.
+Fusionix gives hard questions multiple independent model perspectives, compares them with a judge, and returns one synthesized answer — available as an API, CLI, SDK, and Claude skill.
 
 ---
 

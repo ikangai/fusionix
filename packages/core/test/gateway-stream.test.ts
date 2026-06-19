@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { OpenRouterGateway } from "../src/gateway/openrouter.ts";
-import { isFusionError } from "../src/errors.ts";
+import { isFusionixError } from "../src/errors.ts";
 import type { GatewayCallResult } from "../src/types.ts";
 
 function sseFetch(sse: string, status = 200) {
@@ -63,7 +63,7 @@ test("streamChat aborts an oversized unterminated stream instead of buffering un
       for await (const _ of gen) {
       }
     },
-    (err: unknown) => isFusionError(err) && err.code === "gateway_error",
+    (err: unknown) => isFusionixError(err) && err.code === "gateway_error",
   );
 });
 
@@ -73,6 +73,6 @@ test("streamChat maps a non-2xx to gateway_error", async () => {
   const gen = gw.streamChat({ model: "m", messages: [{ role: "user", content: "q" }] });
   await assert.rejects(
     () => gen.next(),
-    (err: unknown) => isFusionError(err) && err.code === "gateway_error",
+    (err: unknown) => isFusionixError(err) && err.code === "gateway_error",
   );
 });

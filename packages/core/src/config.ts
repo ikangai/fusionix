@@ -3,13 +3,13 @@
  *
  * Model slugs are DATA (spec §4): they live in `config/default.config.json`,
  * not in core logic. Resolution order: bundled default → external file
- * (explicit path, `FUSION_CONFIG`, or `<cwd>/fusion.config.json`) → env
- * overrides (`FUSION_DEFAULT_GATEWAY`, `FUSION_DEFAULT_PRESET`).
+ * (explicit path, `FUSIONIX_CONFIG`, or `<cwd>/fusionix.config.json`) → env
+ * overrides (`FUSIONIX_DEFAULT_GATEWAY`, `FUSIONIX_DEFAULT_PRESET`).
  */
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { FusionConfig, ResolvedPreset, RedactedPreset } from "./types.ts";
-import { FusionError } from "./errors.ts";
+import type { FusionixConfig, ResolvedPreset, RedactedPreset } from "./types.ts";
+import { FusionixError } from "./errors.ts";
 
 interface RawPreset {
   name?: string;
@@ -37,7 +37,7 @@ export interface LoadConfigOptions {
   configPath?: string;
   /** Environment map (defaults to process.env). */
   env?: Record<string, string | undefined>;
-  /** Working directory for auto-discovery of fusion.config.json (defaults to process.cwd()). */
+  /** Working directory for auto-discovery of fusionix.config.json (defaults to process.cwd()). */
   cwd?: string;
 }
 
@@ -63,13 +63,13 @@ function toPreset(key: string, raw: RawPreset): ResolvedPreset {
   return preset;
 }
 
-function normalizeConfig(raw: RawConfig): FusionConfig {
+function normalizeConfig(raw: RawConfig): FusionixConfig {
   const presets: Record<string, ResolvedPreset> = {};
   for (const [key, value] of Object.entries(raw.presets ?? {})) {
     if (RESERVED_KEYS.has(key)) continue;
     presets[key] = toPreset(key, value);
   }
-  const config: FusionConfig = {
+  const config: FusionixConfig = {
     gateway: raw.gateway ?? "https://openrouter.ai/api/v1",
     defaults: {
       maxToolCalls: raw.defaults?.maxToolCalls ?? 8,
@@ -82,8 +82,8 @@ function normalizeConfig(raw: RawConfig): FusionConfig {
 }
 
 /** Deep-merge an external raw config over an already-normalized config. */
-function mergeExternal(base: FusionConfig, raw: RawConfig): FusionConfig {
-  const merged: FusionConfig = {
+function mergeExternal(base: FusionixConfig, raw: RawConfig): FusionixConfig {
+  const merged: FusionixConfig = {
     gateway: raw.gateway ?? base.gateway,
     defaults: {
       maxToolCalls: raw.defaults?.maxToolCalls ?? base.defaults.maxToolCalls,
@@ -114,12 +114,12 @@ async function readJsonFile(path: string): Promise<RawConfig> {
   try {
     text = await readFile(path, "utf8");
   } catch (cause) {
-    throw new FusionError("internal_error", `Could not read config file: ${path}`, { cause });
+    throw new FusionixError("internal_error", `Could not read config file: ${path}`, { cause });
   }
   try {
     return JSON.parse(text) as RawConfig;
   } catch (cause) {
-    throw new FusionError("internal_error", `Config file is not valid JSON: ${path}`, { cause });
+    throw new FusionixError("internal_error", `Config file is not valid JSON: ${path}`, { cause });
   }
 }
 
@@ -132,7 +132,7 @@ async function readJsonFileIfExists(path: string): Promise<RawConfig | undefined
   }
 }
 
-export async function loadConfig(opts: LoadConfigOptions = {}): Promise<FusionConfig> {
+export async function loadConfig(opts: LoadConfigOptions = {}): Promise<FusionixConfig> {
   const env = opts.env ?? process.env;
   const cwd = opts.cwd ?? process.cwd();
 
@@ -140,22 +140,22 @@ export async function loadConfig(opts: LoadConfigOptions = {}): Promise<FusionCo
   let config = normalizeConfig(baseRaw);
 
   // External override file.
-  const explicitPath = opts.configPath ?? env.FUSION_CONFIG;
+  const explicitPath = opts.configPath ?? env.FUSIONIX_CONFIG;
   if (explicitPath) {
     config = mergeExternal(config, await readJsonFile(explicitPath));
   } else {
-    const discovered = await readJsonFileIfExists(join(cwd, "fusion.config.json"));
+    const discovered = await readJsonFileIfExists(join(cwd, "fusionix.config.json"));
     if (discovered) config = mergeExternal(config, discovered);
   }
 
   // Env overrides win last.
-  if (env.FUSION_DEFAULT_GATEWAY) config.gateway = env.FUSION_DEFAULT_GATEWAY;
-  if (env.FUSION_DEFAULT_PRESET) config.defaultPreset = env.FUSION_DEFAULT_PRESET;
+  if (env.FUSIONIX_DEFAULT_GATEWAY) config.gateway = env.FUSIONIX_DEFAULT_GATEWAY;
+  if (env.FUSIONIX_DEFAULT_PRESET) config.defaultPreset = env.FUSIONIX_DEFAULT_PRESET;
 
   // Fail fast on a misconfigured default preset instead of surfacing it later as
   // a confusing "resolved panel is empty" at request time.
   if (config.defaultPreset && !config.presets[config.defaultPreset]) {
-    throw new FusionError(
+    throw new FusionixError(
       "internal_error",
       `Configured default preset '${config.defaultPreset}' is not defined in presets.`,
     );
@@ -173,6 +173,6 @@ export function redactPreset(p: ResolvedPreset): RedactedPreset {
   };
 }
 
-export function listPresetsRedacted(config: FusionConfig): RedactedPreset[] {
+export function listPresetsRedacted(config: FusionixConfig): RedactedPreset[] {
   return Object.values(config.presets).map(redactPreset);
 }

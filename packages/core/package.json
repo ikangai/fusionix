@@ -1,8 +1,8 @@
 {
-  "name": "@ikangai/fusion-core",
+  "name": "@ikangai/fusionix-core",
   "version": "0.1.0",
   "type": "module",
-  "description": "Fusion core: request normalization, panel/judge/writer pipeline, cost tracking, result shaping.",
+  "description": "Fusionix core: request normalization, panel/judge/writer pipeline, cost tracking, result shaping.",
   "exports": {
     ".": {
       "development": "./src/index.ts",

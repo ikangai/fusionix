@@ -6,7 +6,7 @@
  * lookups for cost. Non-2xx maps to `gateway_error` (502) without surfacing
  * stored-key state (§6.6).
  */
-import { FusionError } from "../errors.ts";
+import { FusionixError } from "../errors.ts";
 import { contentToString } from "../messages.ts";
 import type { ChatMessage, GatewayCallResult, GatewayUsage } from "../types.ts";
 
@@ -125,7 +125,7 @@ export class OpenRouterGateway {
       if (opts.signal) init.signal = opts.signal;
       res = await this.doFetch(`${this.base}/chat/completions`, init);
     } catch (cause) {
-      throw new FusionError("gateway_error", "Gateway request failed.", { cause });
+      throw new FusionixError("gateway_error", "Gateway request failed.", { cause });
     }
 
     if (!res.ok) {
@@ -136,14 +136,14 @@ export class OpenRouterGateway {
       } catch {
         detail = undefined;
       }
-      throw new FusionError("gateway_error", `Gateway request failed (HTTP ${res.status}).`, { details: detail });
+      throw new FusionixError("gateway_error", `Gateway request failed (HTTP ${res.status}).`, { details: detail });
     }
 
     let data: Record<string, unknown>;
     try {
       data = (await res.json()) as Record<string, unknown>;
     } catch (cause) {
-      throw new FusionError("gateway_error", "Gateway returned a non-JSON response.", { cause });
+      throw new FusionixError("gateway_error", "Gateway returned a non-JSON response.", { cause });
     }
 
     const choices = data.choices as Array<{ message?: { content?: unknown } }> | undefined;
@@ -173,7 +173,7 @@ export class OpenRouterGateway {
       if (opts.signal) init.signal = opts.signal;
       res = await this.doFetch(`${this.base}/chat/completions`, init);
     } catch (cause) {
-      throw new FusionError("gateway_error", "Gateway request failed.", { cause });
+      throw new FusionixError("gateway_error", "Gateway request failed.", { cause });
     }
     if (!res.ok || !res.body) {
       let detail: unknown;
@@ -182,7 +182,7 @@ export class OpenRouterGateway {
       } catch {
         detail = undefined;
       }
-      throw new FusionError("gateway_error", `Gateway request failed (HTTP ${res.status}).`, { details: detail });
+      throw new FusionixError("gateway_error", `Gateway request failed (HTTP ${res.status}).`, { details: detail });
     }
 
     const reader = res.body.getReader();
@@ -217,7 +217,7 @@ export class OpenRouterGateway {
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
       if (buffer.length > MAX_SSE_LINE_CHARS) {
-        throw new FusionError("gateway_error", "Gateway stream exceeded the maximum line size.");
+        throw new FusionixError("gateway_error", "Gateway stream exceeded the maximum line size.");
       }
       const lines = buffer.split("\n");
       buffer = lines.pop() ?? "";
@@ -226,7 +226,7 @@ export class OpenRouterGateway {
         if (delta !== undefined) {
           content += delta;
           if (content.length > MAX_SSE_CONTENT_CHARS) {
-            throw new FusionError("gateway_error", "Gateway stream exceeded the maximum response size.");
+            throw new FusionixError("gateway_error", "Gateway stream exceeded the maximum response size.");
           }
           yield delta;
         }

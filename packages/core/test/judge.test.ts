@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { runJudge } from "../src/pipeline/judge.ts";
-import { isFusionError } from "../src/errors.ts";
+import { isFusionixError } from "../src/errors.ts";
 import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
 import type { ExecutionPlan, GatewayCallResult, PanelResponse } from "../src/types.ts";
 
@@ -98,7 +98,7 @@ test("throws judge_failed when JSON is missing after one repair", async () => {
   const { gateway, calls } = sequencedGateway([() => ({ content: "no json ever" })]);
   await assert.rejects(
     () => runJudge(makePlan(), "q", panel, { gateway }),
-    (err: unknown) => isFusionError(err) && err.code === "judge_failed" && err.httpStatus === 502,
+    (err: unknown) => isFusionixError(err) && err.code === "judge_failed" && err.httpStatus === 502,
   );
   assert.equal(calls.length, 2, "attempted initial + one repair");
 });
@@ -117,7 +117,7 @@ test("a thrown first judge call → judge_failed with no repair", async () => {
   ]);
   await assert.rejects(
     () => runJudge(makePlan(), "q", panel, { gateway }),
-    (err: unknown) => isFusionError(err) && err.code === "judge_failed",
+    (err: unknown) => isFusionixError(err) && err.code === "judge_failed",
   );
   assert.equal(calls.length, 1, "no repair attempted when the call itself fails");
 });

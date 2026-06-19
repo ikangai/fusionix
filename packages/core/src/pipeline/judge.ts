@@ -6,7 +6,7 @@
  * doesn't parse to an object, the same judge model is asked once to convert it.
  * If that also fails → `judge_failed` (502).
  */
-import { FusionError } from "../errors.ts";
+import { FusionixError } from "../errors.ts";
 import { extractJson } from "../json.ts";
 import { JUDGE_SYSTEM, composeSystem, renderAnswers, renderJudgeUser } from "../prompts.ts";
 import { makeChatRequest } from "../gateway/openrouter.ts";
@@ -14,7 +14,7 @@ import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
 import type {
   Contradiction,
   ExecutionPlan,
-  FusionAnalysis,
+  FusionixAnalysis,
   GatewayCallResult,
   PanelResponse,
   PartialCoverage,
@@ -27,7 +27,7 @@ export interface JudgeDeps {
 }
 
 export interface JudgeOutcome {
-  analysis: FusionAnalysis;
+  analysis: FusionixAnalysis;
   calls: GatewayCallResult[];
 }
 
@@ -80,7 +80,7 @@ function coerceUniqueInsights(value: unknown): UniqueInsight[] {
 }
 
 /** Map a parsed object (snake_case or camelCase) into the canonical analysis with all 6 arrays. */
-export function coerceAnalysis(obj: Record<string, unknown>): FusionAnalysis {
+export function coerceAnalysis(obj: Record<string, unknown>): FusionixAnalysis {
   return {
     consensus: strArray(obj.consensus),
     contradictions: coerceContradictions(obj.contradictions),
@@ -118,7 +118,7 @@ export async function runJudge(
     calls.push(res);
     firstContent = res.content;
   } catch (cause) {
-    throw new FusionError("judge_failed", "Judge call failed.", { cause, runId: plan.runId });
+    throw new FusionixError("judge_failed", "Judge call failed.", { cause, runId: plan.runId });
   }
 
   const first = extractObject(firstContent);
@@ -145,8 +145,8 @@ export async function runJudge(
     const repaired = extractObject(res.content);
     if (repaired) return { analysis: coerceAnalysis(repaired), calls };
   } catch (cause) {
-    throw new FusionError("judge_failed", "Judge repair call failed.", { cause, runId: plan.runId });
+    throw new FusionixError("judge_failed", "Judge repair call failed.", { cause, runId: plan.runId });
   }
 
-  throw new FusionError("judge_failed", "Judge did not return valid JSON after one repair.", { runId: plan.runId });
+  throw new FusionixError("judge_failed", "Judge did not return valid JSON after one repair.", { runId: plan.runId });
 }

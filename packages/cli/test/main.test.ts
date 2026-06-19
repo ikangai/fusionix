@@ -1,12 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { main } from "../src/main.ts";
-import { FusionError } from "@ikangai/fusion-core";
-import type { FusionChatCompletionRequest, FusionConfig, FusionRunResult, RunFusionOptions } from "@ikangai/fusion-core";
+import { FusionixError } from "@ikangai/fusionix-core";
+import type { FusionixChatCompletionRequest, FusionixConfig, FusionixRunResult, RunFusionixOptions } from "@ikangai/fusionix-core";
 
-function sampleResult(overrides: Partial<FusionRunResult> = {}): FusionRunResult {
+function sampleResult(overrides: Partial<FusionixRunResult> = {}): FusionixRunResult {
   return {
-    runId: "fusion-run-1",
+    runId: "fusionix-run-1",
     answer: "The answer is 42.",
     model: "anthropic/claude-opus-4.8",
     panel: [{ model: "A", answer: "a" }],
@@ -31,14 +31,14 @@ function sampleResult(overrides: Partial<FusionRunResult> = {}): FusionRunResult
 function harness(overrides: Record<string, unknown> = {}) {
   const out: string[] = [];
   const err: string[] = [];
-  const calls: { request: FusionChatCompletionRequest; opts: RunFusionOptions }[] = [];
+  const calls: { request: FusionixChatCompletionRequest; opts: RunFusionixOptions }[] = [];
   const deps = {
     env: { OPENROUTER_API_KEY: "k" } as Record<string, string | undefined>,
     isTTY: true,
     readStdin: async () => "",
     stdout: (s: string) => out.push(s),
     stderr: (s: string) => err.push(s),
-    runFusion: async (request: FusionChatCompletionRequest, opts: RunFusionOptions) => {
+    runFusionix: async (request: FusionixChatCompletionRequest, opts: RunFusionixOptions) => {
       calls.push({ request, opts });
       return sampleResult();
     },
@@ -52,7 +52,7 @@ test("--help prints usage and exits 0", async () => {
   const h = harness();
   const code = await main(["--help"], h.deps);
   assert.equal(code, 0);
-  assert.match(h.out(), /fusion/);
+  assert.match(h.out(), /fusionix/);
   assert.match(h.out(), /--local/);
 });
 
@@ -85,14 +85,14 @@ test("local without OPENROUTER_API_KEY → exit 1", async () => {
   assert.match(h.err(), /OPENROUTER_API_KEY/);
 });
 
-test("happy path (md on TTY): prints the answer and calls runFusion with the request", async () => {
+test("happy path (md on TTY): prints the answer and calls runFusionix with the request", async () => {
   const h = harness();
   const code = await main(["Compare X and Y", "--local"], h.deps);
   assert.equal(code, 0);
   assert.match(h.out(), /The answer is 42\./);
   assert.match(h.out(), /cost: \$0\.1200/);
   assert.equal(h.calls.length, 1);
-  assert.equal(h.calls[0]!.request.model, "fusion");
+  assert.equal(h.calls[0]!.request.model, "fusionix");
   assert.equal(h.calls[0]!.request.messages[0]!.content, "Compare X and Y");
   assert.equal(h.calls[0]!.opts.apiKey, "k");
 });
@@ -113,10 +113,10 @@ test("reads the prompt from stdin when no positional is given", async () => {
   assert.equal(h.calls[0]!.request.messages[0]!.content, "piped question");
 });
 
-test("a FusionError from runFusion → exit 1 with message and code", async () => {
+test("a FusionixError from runFusionix → exit 1 with message and code", async () => {
   const h = harness({
-    runFusion: async () => {
-      throw new FusionError("all_panel_failed", "All panel models failed.");
+    runFusionix: async () => {
+      throw new FusionixError("all_panel_failed", "All panel models failed.");
     },
   });
   const code = await main(["q", "--local"], h.deps);
@@ -139,7 +139,7 @@ test("--log writes the run record", async () => {
 
 test("--stream streams writer deltas to stdout", async () => {
   const h = harness({
-    runFusion: async (_req: FusionChatCompletionRequest, opts: RunFusionOptions) => {
+    runFusionix: async (_req: FusionixChatCompletionRequest, opts: RunFusionixOptions) => {
       opts.onWriterDelta?.("Hel");
       opts.onWriterDelta?.("lo");
       return sampleResult({ answer: "Hello" });
@@ -153,7 +153,7 @@ test("--stream streams writer deltas to stdout", async () => {
 
 test("--stream --show-analysis streams the answer, then prints analysis and footer in order", async () => {
   const h = harness({
-    runFusion: async (_req: FusionChatCompletionRequest, opts: RunFusionOptions) => {
+    runFusionix: async (_req: FusionixChatCompletionRequest, opts: RunFusionixOptions) => {
       opts.onWriterDelta?.("Hel");
       opts.onWriterDelta?.("lo");
       return sampleResult({ answer: "Hello" });
@@ -169,7 +169,7 @@ test("--stream --show-analysis streams the answer, then prints analysis and foot
 });
 
 test("--stream falls back to a full render when no deltas are emitted", async () => {
-  const h = harness({ runFusion: async () => sampleResult() }); // never calls onWriterDelta
+  const h = harness({ runFusionix: async () => sampleResult() }); // never calls onWriterDelta
   const code = await main(["q", "--local", "--stream"], h.deps);
   assert.equal(code, 0);
   assert.match(h.out(), /The answer is 42\./); // full answer still printed
@@ -182,7 +182,7 @@ test("--no-web sets webOverride false in run options", async () => {
   assert.equal(h.calls[0]!.opts.webOverride, false);
 });
 
-const smallConfig: FusionConfig = {
+const smallConfig: FusionixConfig = {
   gateway: "https://gw/api/v1",
   defaultPreset: "p",
   defaults: { maxToolCalls: 8, web: true },

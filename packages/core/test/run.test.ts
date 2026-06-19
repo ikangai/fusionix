@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runFusion } from "../src/pipeline/run.ts";
-import { isFusionError } from "../src/errors.ts";
+import { runFusionix } from "../src/pipeline/run.ts";
+import { isFusionixError } from "../src/errors.ts";
 import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
-import type { FusionConfig, FusionStage, GatewayCallResult } from "../src/types.ts";
+import type { FusionixConfig, FusionixStage, GatewayCallResult } from "../src/types.ts";
 
 const VALID_ANALYSIS = JSON.stringify({
   consensus: ["shared"],
@@ -14,7 +14,7 @@ const VALID_ANALYSIS = JSON.stringify({
   ranking: ["A", "B", "C"],
 });
 
-function makeConfig(panel = ["A", "B", "C"]): FusionConfig {
+function makeConfig(panel = ["A", "B", "C"]): FusionixConfig {
   return {
     gateway: "https://gw/api/v1",
     defaultPreset: "p",
@@ -44,7 +44,7 @@ function usage(p: number, c: number, cost?: number): GatewayCallResult["usage"] 
   return u;
 }
 
-const userReq = { model: "fusion", messages: [{ role: "user" as const, content: "What is X?" }] };
+const userReq = { model: "fusionix", messages: [{ role: "user" as const, content: "What is X?" }] };
 
 test("happy path: panel → judge → writer with cost, order, usage, web", async () => {
   const { gateway } = makeGateway((req) => {
@@ -52,7 +52,7 @@ test("happy path: panel → judge → writer with cost, order, usage, web", asyn
     if (req.model.startsWith("W")) return { content: "FINAL ANSWER", usage: usage(30, 15, 0.125) };
     return { content: JSON.stringify({ answer: `ans-${req.model.replace(":online", "")}` }), usage: usage(10, 5, 0.5) };
   });
-  const result = await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x", runId: "fusion-run-x" });
+  const result = await runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x", runId: "fusionix-run-x" });
 
   assert.equal(result.answer, "FINAL ANSWER");
   assert.equal(result.model, "W");
@@ -63,7 +63,7 @@ test("happy path: panel → judge → writer with cost, order, usage, web", asyn
   assert.deepEqual(result.usage, { prompt_tokens: 80, completion_tokens: 40, total_tokens: 120 });
   assert.equal(result.web, "used");
   assert.equal(result.maxToolCallsEnforced, false);
-  assert.equal(result.runId, "fusion-run-x");
+  assert.equal(result.runId, "fusionix-run-x");
   assert.equal(typeof result.durationMs, "number");
   assert.equal(typeof result.created, "number");
 });
@@ -75,7 +75,7 @@ test("one panel failure still yields a synthesized answer", async () => {
     if (req.model.startsWith("W")) return { content: "FINAL" };
     return { content: JSON.stringify({ answer: "ok" }) };
   });
-  const result = await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x" });
+  const result = await runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x" });
   assert.equal(result.answer, "FINAL");
   assert.equal(result.panel?.[1]?.model, "B");
   assert.ok(result.panel?.[1]?.error, "failed member kept in place");
@@ -88,26 +88,26 @@ test("all panel models failing → all_panel_failed", async () => {
     throw new Error("panel down");
   });
   await assert.rejects(
-    () => runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x" }),
-    (err: unknown) => isFusionError(err) && err.code === "all_panel_failed" && err.httpStatus === 502,
+    () => runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x" }),
+    (err: unknown) => isFusionixError(err) && err.code === "all_panel_failed" && err.httpStatus === 502,
   );
 });
 
 test("progress callbacks fire in stage order", async () => {
-  const stages: FusionStage[] = [];
+  const stages: FusionixStage[] = [];
   const { gateway } = makeGateway((req) => {
     if (req.model.startsWith("J")) return { content: VALID_ANALYSIS };
     if (req.model.startsWith("W")) return { content: "FINAL" };
     return { content: JSON.stringify({ answer: "ok" }) };
   });
-  await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x", onProgress: (s) => stages.push(s) });
+  await runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x", onProgress: (s) => stages.push(s) });
   assert.deepEqual(stages, ["panel", "judge", "writer"]);
 });
 
 test("single-model bypass (enabled:false): answer only, no panel/analysis, web off", async () => {
   const { gateway, calls } = makeGateway(() => ({ content: "SINGLE", usage: usage(5, 5, 0.5) }));
-  const result = await runFusion(
-    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+  const result = await runFusionix(
+    { model: "openai/gpt-z", plugins: [{ id: "fusionix", enabled: false }], messages: userReq.messages },
     { config: makeConfig(), gateway, apiKey: "x", webOverride: false },
   );
   assert.equal(result.answer, "SINGLE");
@@ -133,8 +133,8 @@ test("streaming bypass forwards deltas, accumulates the answer, and uses :online
     },
   };
   const deltas: string[] = [];
-  const result = await runFusion(
-    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+  const result = await runFusionix(
+    { model: "openai/gpt-z", plugins: [{ id: "fusionix", enabled: false }], messages: userReq.messages },
     { config: makeConfig(), gateway, apiKey: "x", onWriterDelta: (d) => deltas.push(d) },
   );
   assert.deepEqual(deltas, ["Sin", "gle"]);
@@ -146,8 +146,8 @@ test("streaming bypass forwards deltas, accumulates the answer, and uses :online
 
 test("non-streaming bypass with web: :online success → web 'used'", async () => {
   const { gateway } = makeGateway(() => ({ content: "ANS", usage: usage(2, 2, 0.4) }));
-  const result = await runFusion(
-    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+  const result = await runFusionix(
+    { model: "openai/gpt-z", plugins: [{ id: "fusionix", enabled: false }], messages: userReq.messages },
     { config: makeConfig(), gateway, apiKey: "x" },
   );
   assert.equal(result.web, "used");
@@ -160,8 +160,8 @@ test("non-streaming bypass with web: :online fails then no-web retry succeeds �
     if (req.model.endsWith(":online")) throw new Error("web routing down");
     return { content: "ANS" };
   });
-  const result = await runFusion(
-    { model: "openai/gpt-z", plugins: [{ id: "fusion", enabled: false }], messages: userReq.messages },
+  const result = await runFusionix(
+    { model: "openai/gpt-z", plugins: [{ id: "fusionix", enabled: false }], messages: userReq.messages },
     { config: makeConfig(), gateway, apiKey: "x" },
   );
   assert.equal(result.web, "unsupported");
@@ -171,8 +171,8 @@ test("non-streaming bypass with web: :online fails then no-web retry succeeds �
 test("invalid request is rejected before any gateway call", async () => {
   const { gateway, calls } = makeGateway(() => ({ content: "x" }));
   await assert.rejects(
-    () => runFusion({ model: "openai/x", messages: userReq.messages }, { config: makeConfig(), gateway, apiKey: "x" }),
-    (err: unknown) => isFusionError(err) && err.code === "not_a_fusion_request",
+    () => runFusionix({ model: "openai/x", messages: userReq.messages }, { config: makeConfig(), gateway, apiKey: "x" }),
+    (err: unknown) => isFusionixError(err) && err.code === "not_a_fusionix_request",
   );
   assert.equal(calls.length, 0);
 });
@@ -183,7 +183,7 @@ test("web off when the plan disables web", async () => {
     if (req.model.startsWith("W")) return { content: "FINAL" };
     return { content: JSON.stringify({ answer: "ok" }) };
   });
-  const result = await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x", webOverride: false });
+  const result = await runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x", webOverride: false });
   assert.equal(result.web, "off");
   // panel calls must NOT carry :online
   assert.ok(calls.filter((c) => c.model.includes(":online")).length === 0);
@@ -207,8 +207,8 @@ test("deadline during panel: ≥1 survivor avoids all_panel_failed, but judge fa
   });
   await assert.rejects(
     () =>
-      runFusion(userReq, { config: makeConfig(["FAST", "SLOW"]), gateway, apiKey: "x", maxRequestDurationMs: 30 }),
-    (err: unknown) => isFusionError(err) && err.code === "judge_failed",
+      runFusionix(userReq, { config: makeConfig(["FAST", "SLOW"]), gateway, apiKey: "x", maxRequestDurationMs: 30 }),
+    (err: unknown) => isFusionixError(err) && err.code === "judge_failed",
   );
 });
 
@@ -221,7 +221,7 @@ test("web 'unsupported' when web is requested but every member falls back from :
       return { content: JSON.stringify({ answer: "ok" }) };
     },
   };
-  const result = await runFusion(userReq, { config: makeConfig(), gateway, apiKey: "x" });
+  const result = await runFusionix(userReq, { config: makeConfig(), gateway, apiKey: "x" });
   assert.equal(result.web, "unsupported");
   assert.equal(result.answer, "FINAL");
   assert.ok(result.panel?.every((p) => !p.error), "members succeeded via no-web fallback");
@@ -241,7 +241,7 @@ test("backfills a streamed writer cost via getGeneration when the stream omits u
       return id === "gen-writer" ? { cost: 0.25 } : undefined;
     },
   };
-  const result = await runFusion(userReq, {
+  const result = await runFusionix(userReq, {
     config: makeConfig(),
     gateway,
     apiKey: "x",
@@ -264,7 +264,7 @@ test("onWriterDelta streams the final answer when the gateway supports it", asyn
     },
   };
   const deltas: string[] = [];
-  const result = await runFusion(userReq, {
+  const result = await runFusionix(userReq, {
     config: makeConfig(),
     gateway,
     apiKey: "x",
@@ -286,12 +286,12 @@ test("timeout with zero survivors → all_panel_failed", async () => {
   });
   await assert.rejects(
     () =>
-      runFusion(userReq, {
+      runFusionix(userReq, {
         config: makeConfig(["SLOW1", "SLOW2"]),
         gateway,
         apiKey: "x",
         maxRequestDurationMs: 30,
       }),
-    (err: unknown) => isFusionError(err) && err.code === "all_panel_failed",
+    (err: unknown) => isFusionixError(err) && err.code === "all_panel_failed",
   );
 });

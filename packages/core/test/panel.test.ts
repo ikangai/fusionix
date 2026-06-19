@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runPanel } from "../src/pipeline/panel.ts";
 import { PANEL_SYSTEM } from "../src/prompts.ts";
-import { FusionError } from "../src/errors.ts";
+import { FusionixError } from "../src/errors.ts";
 import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
 import type { ExecutionPlan, GatewayCallResult } from "../src/types.ts";
 
@@ -51,7 +51,7 @@ test("runs all panel models in resolved order and parses JSON answers", async ()
 
 test("a failed panel member stays in position as {model, error}", async () => {
   const responder: Responder = (model) => {
-    if (model === "B") throw new FusionError("gateway_error", "boom");
+    if (model === "B") throw new FusionixError("gateway_error", "boom");
     return { content: JSON.stringify({ answer: `a-${model}` }) };
   };
   const { gateway } = fakeGateway(responder);

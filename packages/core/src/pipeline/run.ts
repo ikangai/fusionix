@@ -8,7 +8,7 @@
  * from judge_failed (§17).
  */
 import { aggregateUsage } from "../cost.ts";
-import { FusionError } from "../errors.ts";
+import { FusionixError } from "../errors.ts";
 import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
 import { normalizeRequest } from "../normalize.ts";
@@ -22,10 +22,10 @@ import type { WebCallOptions } from "./web-call.ts";
 import type { ChatGateway, GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
   ExecutionPlan,
-  FusionChatCompletionRequest,
-  FusionConfig,
-  FusionRunResult,
-  FusionStage,
+  FusionixChatCompletionRequest,
+  FusionixConfig,
+  FusionixRunResult,
+  FusionixStage,
   GatewayCallResult,
   PanelResponse,
   WebStatus,
@@ -33,9 +33,9 @@ import type {
 
 const DEFAULT_MAX_REQUEST_DURATION_MS = 180_000;
 
-export interface RunFusionOptions {
+export interface RunFusionixOptions {
   /** Pre-loaded config; if omitted, loadConfig() runs (reads bundled default + overrides). */
-  config?: FusionConfig;
+  config?: FusionixConfig;
   /** Gateway API key (e.g. OPENROUTER_API_KEY). Required unless `gateway` is injected. */
   apiKey?: string;
   /** Gateway base URL; defaults to config.gateway. */
@@ -54,17 +54,17 @@ export interface RunFusionOptions {
   referer?: string;
   title?: string;
   categories?: string;
-  onProgress?: (stage: FusionStage) => void;
+  onProgress?: (stage: FusionixStage) => void;
   /** Stream the final answer (writer / bypass) token-by-token (CLI --stream). */
   onWriterDelta?: (delta: string) => void;
   /** Injectable clock (tests). Defaults to Date.now. */
   now?: () => number;
 }
 
-function buildGateway(config: FusionConfig, opts: RunFusionOptions): ChatGateway {
+function buildGateway(config: FusionixConfig, opts: RunFusionixOptions): ChatGateway {
   if (opts.gateway) return opts.gateway;
   if (!opts.apiKey) {
-    throw new FusionError("gateway_error", "No gateway API key configured (set OPENROUTER_API_KEY).");
+    throw new FusionixError("gateway_error", "No gateway API key configured (set OPENROUTER_API_KEY).");
   }
   const clientOpts: GatewayClientOptions = { apiKey: opts.apiKey, baseUrl: opts.baseUrl ?? config.gateway };
   if (opts.fetch) clientOpts.fetch = opts.fetch;
@@ -105,10 +105,10 @@ function resolveWebStatus(plan: ExecutionPlan, webUsed: boolean): WebStatus {
   return webUsed ? "used" : "unsupported";
 }
 
-export async function runFusion(
-  request: FusionChatCompletionRequest,
-  opts: RunFusionOptions = {},
-): Promise<FusionRunResult> {
+export async function runFusionix(
+  request: FusionixChatCompletionRequest,
+  opts: RunFusionixOptions = {},
+): Promise<FusionixRunResult> {
   const now = opts.now ?? Date.now;
   const startedAt = now();
 
@@ -116,7 +116,7 @@ export async function runFusion(
   const normOpts: { runId?: string; webOverride?: boolean } = {};
   if (opts.runId) normOpts.runId = opts.runId;
   if (opts.webOverride !== undefined) normOpts.webOverride = opts.webOverride;
-  const plan = normalizeRequest(request, config, normOpts); // throws invalid_request / not_a_fusion_request
+  const plan = normalizeRequest(request, config, normOpts); // throws invalid_request / not_a_fusionix_request
 
   const gateway = buildGateway(config, opts);
 
@@ -147,7 +147,7 @@ export async function runFusion(
     // surface as judge_failed/writer_failed — distinct from all_panel_failed here.
     const successes = responses.filter((r) => r.error === undefined && r.answer !== undefined);
     if (successes.length === 0) {
-      throw new FusionError("all_panel_failed", "All panel models failed.", { runId: plan.runId });
+      throw new FusionixError("all_panel_failed", "All panel models failed.", { runId: plan.runId });
     }
 
     const prompt = renderCompactPrompt(plan.messages);
@@ -162,7 +162,7 @@ export async function runFusion(
     const allCalls = [...panelCalls, ...judgeCalls, writerCall];
     await backfillCosts(deps.gateway, allCalls);
     const { usage, costUsd } = aggregateUsage(allCalls);
-    const result: FusionRunResult = {
+    const result: FusionixRunResult = {
       runId: plan.runId,
       answer,
       model: plan.writer,
@@ -185,10 +185,10 @@ export async function runFusion(
 async function runBypass(
   plan: ExecutionPlan,
   deps: { gateway: ChatGateway; signal: AbortSignal },
-  opts: RunFusionOptions,
+  opts: RunFusionixOptions,
   startedAt: number,
   now: () => number,
-): Promise<FusionRunResult> {
+): Promise<FusionixRunResult> {
   opts.onProgress?.("writer");
 
   let call: GatewayCallResult;
@@ -211,10 +211,10 @@ async function runBypass(
       usedWeb = out.usedWeb;
     }
   } catch (cause) {
-    throw new FusionError("writer_failed", "Single-model call failed.", { cause, runId: plan.runId });
+    throw new FusionixError("writer_failed", "Single-model call failed.", { cause, runId: plan.runId });
   }
   if (!call.content || call.content.trim().length === 0) {
-    throw new FusionError("writer_failed", "Single-model call returned an empty answer.", { runId: plan.runId });
+    throw new FusionixError("writer_failed", "Single-model call returned an empty answer.", { runId: plan.runId });
   }
 
   await backfillCosts(deps.gateway, [call]);

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { loadConfig, redactPreset, listPresetsRedacted } from "../src/config.ts";
 
 async function emptyDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "fusion-cfg-"));
+  return mkdtemp(join(tmpdir(), "fusionix-cfg-"));
 }
 
 test("loads bundled default config with gateway, defaults and the 6 presets", async () => {
@@ -30,10 +30,10 @@ test("loads bundled default config with gateway, defaults and the 6 presets", as
   await rm(dir, { recursive: true, force: true });
 });
 
-test("env FUSION_DEFAULT_GATEWAY and FUSION_DEFAULT_PRESET override the defaults", async () => {
+test("env FUSIONIX_DEFAULT_GATEWAY and FUSIONIX_DEFAULT_PRESET override the defaults", async () => {
   const dir = await emptyDir();
   const cfg = await loadConfig({
-    env: { FUSION_DEFAULT_GATEWAY: "https://example.test/api/v1", FUSION_DEFAULT_PRESET: "research-high" },
+    env: { FUSIONIX_DEFAULT_GATEWAY: "https://example.test/api/v1", FUSIONIX_DEFAULT_PRESET: "research-high" },
     cwd: dir,
   });
   assert.equal(cfg.gateway, "https://example.test/api/v1");
@@ -43,7 +43,7 @@ test("env FUSION_DEFAULT_GATEWAY and FUSION_DEFAULT_PRESET override the defaults
 
 test("external config file deep-merges presets by key and adds new presets", async () => {
   const dir = await emptyDir();
-  const file = join(dir, "fusion.config.json");
+  const file = join(dir, "fusionix.config.json");
   await writeFile(
     file,
     JSON.stringify({
@@ -65,9 +65,9 @@ test("external config file deep-merges presets by key and adds new presets", asy
   await rm(dir, { recursive: true, force: true });
 });
 
-test("auto-discovers <cwd>/fusion.config.json when no explicit path is given", async () => {
+test("auto-discovers <cwd>/fusionix.config.json when no explicit path is given", async () => {
   const dir = await emptyDir();
-  await writeFile(join(dir, "fusion.config.json"), JSON.stringify({ defaultPreset: "general-budget" }));
+  await writeFile(join(dir, "fusionix.config.json"), JSON.stringify({ defaultPreset: "general-budget" }));
   const cfg = await loadConfig({ env: {}, cwd: dir });
   assert.equal(cfg.defaultPreset, "general-budget");
   await rm(dir, { recursive: true, force: true });
@@ -103,7 +103,7 @@ test("a brand-new partial preset is created with empty judge/writer (no base to 
   // Documents the merge-vs-create asymmetry: deep-merge only applies to existing
   // keys; a new partial preset gets empty judge/writer and fails later at use.
   const dir = await emptyDir();
-  const file = join(dir, "fusion.config.json");
+  const file = join(dir, "fusionix.config.json");
   await writeFile(file, JSON.stringify({ presets: { partial: { panel: ["x"] } } }));
   const cfg = await loadConfig({ configPath: file, env: {}, cwd: dir });
   assert.deepEqual(cfg.presets["partial"]!.panel, ["x"]);
@@ -114,13 +114,13 @@ test("a brand-new partial preset is created with empty judge/writer (no base to 
 
 test("throws fast when defaultPreset points at a missing preset", async () => {
   const dir = await emptyDir();
-  await assert.rejects(() => loadConfig({ env: { FUSION_DEFAULT_PRESET: "does-not-exist" }, cwd: dir }));
+  await assert.rejects(() => loadConfig({ env: { FUSIONIX_DEFAULT_PRESET: "does-not-exist" }, cwd: dir }));
   await rm(dir, { recursive: true, force: true });
 });
 
 test("ignores reserved preset keys like __proto__ (no prototype pollution)", async () => {
   const dir = await emptyDir();
-  const file = join(dir, "fusion.config.json");
+  const file = join(dir, "fusionix.config.json");
   await writeFile(file, '{"presets":{"__proto__":{"panel":["x"],"judge":"j","writer":"w","polluted":true}}}');
   const cfg = await loadConfig({ configPath: file, env: {}, cwd: dir });
   assert.equal(Object.keys(cfg.presets).length, 6, "reserved key not added as a preset");

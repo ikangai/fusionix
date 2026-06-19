@@ -1,5 +1,5 @@
 {
-  "$comment": "Fusion deployment defaults. Slugs are DATA, not core logic (spec §4). Verify against GET {gateway}/models before deploy; model IDs drift. Verified against openrouter.ai/api/v1/models on 2026-06-18.",
+  "$comment": "Fusionix deployment defaults. Slugs are DATA, not core logic (spec §4). Verify against GET {gateway}/models before deploy; model IDs drift. Verified against openrouter.ai/api/v1/models on 2026-06-18.",
   "gateway": "https://openrouter.ai/api/v1",
   "defaultPreset": "general-high",
   "defaults": {

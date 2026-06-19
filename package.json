@@ -1,9 +1,9 @@
 {
-  "name": "fusion-monorepo",
+  "name": "fusionix-monorepo",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Fusion — OpenRouter-shaped multi-model deliberation engine (monorepo root)",
+  "description": "Fusionix — OpenRouter-shaped multi-model deliberation engine (monorepo root)",
   "workspaces": [
     "packages/*"
   ],
@@ -17,7 +17,7 @@
     "test": "node --conditions=development --test \"packages/*/test/**/*.test.ts\"",
     "test:core": "node --conditions=development --test \"packages/core/test/**/*.test.ts\"",
     "test:cli": "node --conditions=development --test \"packages/cli/test/**/*.test.ts\"",
-    "fusion": "node --conditions=development packages/cli/src/index.ts"
+    "fusionix": "node --conditions=development packages/cli/src/index.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",

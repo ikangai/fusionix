@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** `fusion` bin entry. Delegates to main() and sets the process exit code. */
+/** `fusionix` bin entry. Delegates to main() and sets the process exit code. */
 import { main } from "./main.ts";
 
 main(process.argv.slice(2))
@@ -7,6 +7,6 @@ main(process.argv.slice(2))
     process.exitCode = code;
   })
   .catch((e: unknown) => {
-    process.stderr.write(`fusion: ${e instanceof Error ? e.message : String(e)}\n`);
+    process.stderr.write(`fusionix: ${e instanceof Error ? e.message : String(e)}\n`);
     process.exitCode = 1;
   });

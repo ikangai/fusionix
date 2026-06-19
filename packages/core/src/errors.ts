@@ -1,14 +1,14 @@
 /**
- * Fusion error model. Codes and HTTP status mapping per spec §6.6.
+ * Fusionix error model. Codes and HTTP status mapping per spec §6.6.
  *
- * Core throws `FusionError`; the hosted API (Phase 2) maps `httpStatus`/`code`
+ * Core throws `FusionixError`; the hosted API (Phase 2) maps `httpStatus`/`code`
  * onto the OpenAI-shaped error object. The CLI renders `message`.
  */
 
 /** Documented error codes mapped to their HTTP status (§6.6). */
-export const FUSION_ERROR_HTTP_STATUS = {
+export const FUSIONIX_ERROR_HTTP_STATUS = {
   invalid_request: 400,
-  not_a_fusion_request: 400,
+  not_a_fusionix_request: 400,
   unauthorized: 401,
   prompt_too_large: 413,
   limit_exceeded: 429,
@@ -19,12 +19,12 @@ export const FUSION_ERROR_HTTP_STATUS = {
   internal_error: 500,
 } as const;
 
-export type FusionErrorCode = keyof typeof FUSION_ERROR_HTTP_STATUS;
+export type FusionixErrorCode = keyof typeof FUSIONIX_ERROR_HTTP_STATUS;
 
-const DEFAULT_MESSAGES: Record<FusionErrorCode, string> = {
+const DEFAULT_MESSAGES: Record<FusionixErrorCode, string> = {
   invalid_request: "Invalid request.",
-  not_a_fusion_request: "Not a Fusion request.",
-  unauthorized: "Missing or invalid Fusion API key.",
+  not_a_fusionix_request: "Not a Fusionix request.",
+  unauthorized: "Missing or invalid Fusionix API key.",
   prompt_too_large: "Prompt too large.",
   limit_exceeded: "Per-key limit exceeded.",
   all_panel_failed: "All panel models failed.",
@@ -34,28 +34,28 @@ const DEFAULT_MESSAGES: Record<FusionErrorCode, string> = {
   internal_error: "Internal error.",
 };
 
-export interface FusionErrorOptions {
+export interface FusionixErrorOptions {
   runId?: string;
   details?: unknown;
   cause?: unknown;
 }
 
-export class FusionError extends Error {
-  readonly code: FusionErrorCode;
+export class FusionixError extends Error {
+  readonly code: FusionixErrorCode;
   readonly httpStatus: number;
   readonly runId?: string;
   readonly details?: unknown;
 
-  constructor(code: FusionErrorCode, message?: string, opts: FusionErrorOptions = {}) {
+  constructor(code: FusionixErrorCode, message?: string, opts: FusionixErrorOptions = {}) {
     super(message ?? DEFAULT_MESSAGES[code], opts.cause !== undefined ? { cause: opts.cause } : undefined);
-    this.name = "FusionError";
+    this.name = "FusionixError";
     this.code = code;
-    this.httpStatus = FUSION_ERROR_HTTP_STATUS[code];
+    this.httpStatus = FUSIONIX_ERROR_HTTP_STATUS[code];
     if (opts.runId !== undefined) this.runId = opts.runId;
     if (opts.details !== undefined) this.details = opts.details;
   }
 }
 
-export function isFusionError(value: unknown): value is FusionError {
-  return value instanceof FusionError;
+export function isFusionixError(value: unknown): value is FusionixError {
+  return value instanceof FusionixError;
 }

@@ -6,11 +6,11 @@
  * `writer_failed` (502); the simplified judge produces no prose, so there is no
  * synthesis to fall back to (§17).
  */
-import { FusionError } from "../errors.ts";
+import { FusionixError } from "../errors.ts";
 import { WRITER_SYSTEM, composeSystem, renderWriterUser } from "../prompts.ts";
 import { makeChatRequest } from "../gateway/openrouter.ts";
 import type { ChatGateway } from "../gateway/openrouter.ts";
-import type { ExecutionPlan, FusionAnalysis, GatewayCallResult } from "../types.ts";
+import type { ExecutionPlan, FusionixAnalysis, GatewayCallResult } from "../types.ts";
 
 export interface WriterDeps {
   gateway: ChatGateway;
@@ -39,7 +39,7 @@ export async function consumeStream(
 export async function runWriter(
   plan: ExecutionPlan,
   prompt: string,
-  analysis: FusionAnalysis,
+  analysis: FusionixAnalysis,
   deps: WriterDeps,
 ): Promise<WriterOutcome> {
   const systemText = composeSystem(WRITER_SYSTEM, plan.writerSystem);
@@ -64,11 +64,11 @@ export async function runWriter(
       call = await deps.gateway.chat(req, callOpts);
     }
   } catch (cause) {
-    throw new FusionError("writer_failed", "Writer call failed.", { cause, runId: plan.runId });
+    throw new FusionixError("writer_failed", "Writer call failed.", { cause, runId: plan.runId });
   }
 
   if (!call.content || call.content.trim().length === 0) {
-    throw new FusionError("writer_failed", "Writer returned an empty answer.", { runId: plan.runId });
+    throw new FusionixError("writer_failed", "Writer returned an empty answer.", { runId: plan.runId });
   }
 
   return { answer: call.content, call };

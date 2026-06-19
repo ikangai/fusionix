@@ -1,5 +1,5 @@
 {
-  "$comment": "Example deployment override. Copy to fusion.config.json (or point FUSION_CONFIG at it). It deep-merges over packages/core/config/default.config.json: top-level fields replace, presets merge by key. Verify slugs against GET {gateway}/models before deploying.",
+  "$comment": "Example deployment override. Copy to fusionix.config.json (or point FUSIONIX_CONFIG at it). It deep-merges over packages/core/config/default.config.json: top-level fields replace, presets merge by key. Verify slugs against GET {gateway}/models before deploying.",
   "gateway": "https://openrouter.ai/api/v1",
   "defaultPreset": "general-high",
   "presets": {

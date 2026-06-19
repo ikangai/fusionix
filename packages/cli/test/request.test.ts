@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import { buildRequest } from "../src/request.ts";
 import { parseCliArgs } from "../src/args.ts";
 
-test("default: model 'fusion' with an empty fusion plugin and a user message", () => {
+test("default: model 'fusionix' with an empty fusionix plugin and a user message", () => {
   const { request, webOverride } = buildRequest(parseCliArgs(["hello?"]), "hello?");
-  assert.equal(request.model, "fusion");
+  assert.equal(request.model, "fusionix");
   assert.deepEqual(request.messages, [{ role: "user", content: "hello?" }]);
-  assert.deepEqual(request.plugins, [{ id: "fusion" }]);
+  assert.deepEqual(request.plugins, [{ id: "fusionix" }]);
   assert.equal(webOverride, undefined);
 });
 
-test("--writer sets the top-level model (writer) and keeps a fusion plugin", () => {
+test("--writer sets the top-level model (writer) and keeps a fusionix plugin", () => {
   const { request } = buildRequest(parseCliArgs(["q", "--writer", "anthropic/claude-x"]), "q");
   assert.equal(request.model, "anthropic/claude-x");
-  assert.equal(request.plugins?.[0]?.id, "fusion");
+  assert.equal(request.plugins?.[0]?.id, "fusionix");
 });
 
 test("maps preset, panel, judge and max-tool-calls into the plugin", () => {

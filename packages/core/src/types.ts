@@ -1,10 +1,10 @@
 /**
- * Shared Fusion types.
+ * Shared Fusionix types.
  *
  * Two boundaries to keep straight:
  *  - WIRE request (§6.2) uses the OpenRouter/OpenAI shape: snake_case fields.
  *  - Canonical CORE result types below use camelCase (matching the SDK, §9.4).
- *    The wire `fusion` object (§6.3, snake_case) is produced by an explicit
+ *    The wire `fusionix` object (§6.3, snake_case) is produced by an explicit
  *    boundary mapper, not by the pipeline.
  */
 
@@ -26,8 +26,8 @@ export interface ChatMessage {
   name?: string;
 }
 
-export interface FusionPlugin {
-  id: "fusion";
+export interface FusionixPlugin {
+  id: "fusionix";
   preset?: string;
   analysis_models?: string[];
   /** Judge model. */
@@ -37,11 +37,11 @@ export interface FusionPlugin {
   enabled?: boolean;
 }
 
-export interface FusionChatCompletionRequest {
-  /** Writer model, or "fusion" for the default writer (§6.8). */
+export interface FusionixChatCompletionRequest {
+  /** Writer model, or "fusionix" for the default writer (§6.8). */
   model: string;
   messages: ChatMessage[];
-  plugins?: FusionPlugin[];
+  plugins?: FusionixPlugin[];
   /** Writer only (§6.8). */
   temperature?: number;
   /** Writer only (§6.8). */
@@ -67,15 +67,15 @@ export interface ResolvedPreset {
   writerSystem?: string;
 }
 
-export interface FusionConfigDefaults {
+export interface FusionixConfigDefaults {
   maxToolCalls: number;
   web: boolean;
 }
 
-export interface FusionConfig {
+export interface FusionixConfig {
   gateway: string;
   defaultPreset?: string;
-  defaults: FusionConfigDefaults;
+  defaults: FusionixConfigDefaults;
   presets: Record<string, ResolvedPreset>;
 }
 
@@ -170,7 +170,7 @@ export interface UniqueInsight {
   insight: string;
 }
 
-export interface FusionAnalysis {
+export interface FusionixAnalysis {
   consensus: string[];
   contradictions: Contradiction[];
   partialCoverage: PartialCoverage[];
@@ -187,9 +187,9 @@ export interface Usage {
 
 export type WebStatus = "used" | "off" | "unsupported";
 
-export type FusionStage = "panel" | "judge" | "writer";
+export type FusionixStage = "panel" | "judge" | "writer";
 
-export interface FusionRunResult {
+export interface FusionixRunResult {
   runId: string;
   /** Final synthesized answer (always present on success). */
   answer: string;
@@ -198,7 +198,7 @@ export interface FusionRunResult {
   /** Omitted in single-model bypass mode (§6.7). */
   panel?: PanelResponse[];
   /** Omitted in single-model bypass mode (§6.7). */
-  analysis?: FusionAnalysis;
+  analysis?: FusionixAnalysis;
   usage: Usage;
   /** USD; null when the gateway reports no cost (§8.1). */
   costUsd: number | null;

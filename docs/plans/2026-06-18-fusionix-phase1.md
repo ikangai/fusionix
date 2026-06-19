@@ -1,8 +1,8 @@
-# Fusion Phase 1 (Core + Local CLI) Implementation Plan
+# Fusionix Phase 1 (Core + Local CLI) Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:test-driven-development for each task. Commit after each green task.
 
-**Goal:** Build the Fusion core deliberation pipeline (panel → judge → writer) and a local CLI so that `fusion "hard question" --local --preset general-high` runs the pipeline against OpenRouter and returns one synthesized answer with `cost_usd`, panel in resolved order, caller system messages preserved, and the §14 parse-failure rules.
+**Goal:** Build the Fusionix core deliberation pipeline (panel → judge → writer) and a local CLI so that `fusionix "hard question" --local --preset general-high` runs the pipeline against OpenRouter and returns one synthesized answer with `cost_usd`, panel in resolved order, caller system messages preserved, and the §14 parse-failure rules.
 
 **Architecture:** TypeScript ESM monorepo (npm workspaces). `packages/core` is pure logic (no web/CLI/UI): request normalization (§6.8), message handling (§14.0), preset expansion, an OpenRouter gateway client, the three pipeline stages, cost aggregation, timeout/cancellation, and result shaping. `packages/cli` is a thin wrapper that, with `--local`, calls core directly using `OPENROUTER_API_KEY`. Model slugs live in `packages/core/config/default.config.json` (data), never in core logic.
 
@@ -26,9 +26,9 @@
 ## Module map (packages/core/src)
 
 ```
-index.ts        public API: runFusion(request, opts) + type re-exports
-types.ts        wire + internal types (FusionChatCompletionRequest, PanelResponse, FusionAnalysis, ExecutionPlan, GatewayCall, ...)
-errors.ts       FusionError (code, httpStatus) + code constants
+index.ts        public API: runFusionix(request, opts) + type re-exports
+types.ts        wire + internal types (FusionixChatCompletionRequest, PanelResponse, FusionixAnalysis, ExecutionPlan, GatewayCall, ...)
+errors.ts       FusionixError (code, httpStatus) + code constants
 json.ts         extractJson(text): lenient JSON extraction (fences, first balanced object)
 config.ts       loadConfig(opts): default config + file/env overrides; redactPreset()
 normalize.ts    normalizeRequest(request, config): ExecutionPlan + validation (§6.8)
@@ -38,9 +38,9 @@ gateway/openrouter.ts  OpenRouterGateway: chat(), listModels(), getGeneration();
 gateway/web.ts  applyWeb(model, web): ":online" suffix mechanism + reporting
 cost.ts         aggregateUsage(calls): {usage, costUsd|null}
 pipeline/panel.ts   runPanel(plan, messages, deps) → PanelResponse[] (resolved order, failures in place)
-pipeline/judge.ts   runJudge(plan, prompt, panel, deps) → FusionAnalysis (one repair attempt)
+pipeline/judge.ts   runJudge(plan, prompt, panel, deps) → FusionixAnalysis (one repair attempt)
 pipeline/writer.ts  runWriter(plan, prompt, analysis, deps) → {answer, call}
-pipeline/run.ts     orchestrate: bypass | panel→judge→writer; deadline; cost; shape FusionRunResult
+pipeline/run.ts     orchestrate: bypass | panel→judge→writer; deadline; cost; shape FusionixRunResult
 util.ts         withTimeout/deadline helpers, defaultRandomId
 ```
 
@@ -56,13 +56,13 @@ Monorepo root (`package.json`, `tsconfig.base.json`, `tsconfig.json`), `packages
 
 **Files:** Create `packages/core/src/errors.ts`, `packages/core/src/types.ts`; Test `packages/core/test/errors.test.ts`.
 
-`errors.ts`: `FUSION_ERROR_CODES` const map → HTTP status (per §6.6). `class FusionError extends Error { code; httpStatus; runId?; details? }`. Helper `isFusionError`.
+`errors.ts`: `FUSIONIX_ERROR_CODES` const map → HTTP status (per §6.6). `class FusionixError extends Error { code; httpStatus; runId?; details? }`. Helper `isFusionixError`.
 
-Codes/status: `invalid_request`=400, `not_a_fusion_request`=400, `unauthorized`=401, `prompt_too_large`=413, `limit_exceeded`=429, `all_panel_failed`=502, `judge_failed`=502, `writer_failed`=502, `gateway_error`=502, `internal_error`=500.
+Codes/status: `invalid_request`=400, `not_a_fusionix_request`=400, `unauthorized`=401, `prompt_too_large`=413, `limit_exceeded`=429, `all_panel_failed`=502, `judge_failed`=502, `writer_failed`=502, `gateway_error`=502, `internal_error`=500.
 
-`types.ts`: wire types (`ChatMessage`, `FusionPlugin`, `FusionChatCompletionRequest`), result types (`PanelResponse`, `FusionAnalysis`, `Usage`, `FusionExtras`, `FusionRunResult`), internal (`ResolvedPreset`, `ExecutionPlan`, `GatewayCallResult`, `FusionConfig`).
+`types.ts`: wire types (`ChatMessage`, `FusionixPlugin`, `FusionixChatCompletionRequest`), result types (`PanelResponse`, `FusionixAnalysis`, `Usage`, `FusionixExtras`, `FusionixRunResult`), internal (`ResolvedPreset`, `ExecutionPlan`, `GatewayCallResult`, `FusionixConfig`).
 
-**Tests:** `new FusionError("all_panel_failed").httpStatus === 502`; codes map present; `isFusionError` true/false.
+**Tests:** `new FusionixError("all_panel_failed").httpStatus === 502`; codes map present; `isFusionixError` true/false.
 
 **Commit:** `feat(core): error types and core type definitions`
 
@@ -84,10 +84,10 @@ Panel/judge return JSON in prose sometimes. `extractJson(text): unknown | undefi
 
 ## Task 3 — Config loader (`config.ts`)
 
-`loadConfig(opts?: {configPath?; env?; cwd?}): Promise<FusionConfig>`:
+`loadConfig(opts?: {configPath?; env?; cwd?}): Promise<FusionixConfig>`:
 1. Read bundled `../config/default.config.json` via `new URL(..., import.meta.url)`.
-2. Merge external file if `opts.configPath` || `env.FUSION_CONFIG` || `<cwd>/fusion.config.json` exists (shallow-merge top-level, presets merged by key).
-3. Env overrides: `FUSION_DEFAULT_GATEWAY`→gateway, `FUSION_DEFAULT_PRESET`→defaultPreset.
+2. Merge external file if `opts.configPath` || `env.FUSIONIX_CONFIG` || `<cwd>/fusionix.config.json` exists (shallow-merge top-level, presets merged by key).
+3. Env overrides: `FUSIONIX_DEFAULT_GATEWAY`→gateway, `FUSIONIX_DEFAULT_PRESET`→defaultPreset.
 `redactPreset(p)` → `{name, description, panel_size, web}` (§5.2). `listPresetsRedacted(config)`.
 
 **Tests:** default config loads with 6 presets + gateway; env override changes gateway/defaultPreset; external file merges/overrides a preset; `redactPreset` hides slugs and emits `panel_size`.
@@ -100,22 +100,22 @@ Panel/judge return JSON in prose sometimes. `extractJson(text): unknown | undefi
 
 `normalizeRequest(request, config): ExecutionPlan`. Order: defaults → default preset → `plugins[0].preset` → explicit overrides → bypass flag → **validate** → plan.
 
-Trigger/validation (throw `FusionError`):
-- `>1` fusion plugin → `invalid_request`.
-- top-level `model` concrete (not "fusion") AND no fusion plugin → `not_a_fusion_request`.
-- not a fusion request at all (model not "fusion", no plugin) → `not_a_fusion_request`.
-- `model==="fusion"` & no `plugins` → synthesize implicit plugin from defaults.
+Trigger/validation (throw `FusionixError`):
+- `>1` fusionix plugin → `invalid_request`.
+- top-level `model` concrete (not "fusionix") AND no fusionix plugin → `not_a_fusionix_request`.
+- not a fusionix request at all (model not "fusionix", no plugin) → `not_a_fusionix_request`.
+- `model==="fusionix"` & no `plugins` → synthesize implicit plugin from defaults.
 - `messages` missing/empty → `invalid_request`; no user message → `invalid_request`.
 - `analysis_models` present but empty → `invalid_request`.
 - resolved panel empty / judge missing / writer missing → `invalid_request`.
 - `max_tool_calls` present & not positive int → `invalid_request`.
 - `stream` present & not boolean → `invalid_request`.
 
-Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ?? preset.judge; writer = (top `model`!=="fusion" ? top model : preset.writer); web = `plugin.enabled===false`? n/a : preset.web (default true); writerTemperature = `request.temperature` ?? preset.temperature; writerMaxTokens = `request.max_tokens` ?? preset.maxTokens; panel/judge temperature = preset.temperature; maxToolCalls = `plugin.max_tool_calls` ?? defaults.maxToolCalls; bypass = `plugin.enabled===false`.
+Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ?? preset.judge; writer = (top `model`!=="fusionix" ? top model : preset.writer); web = `plugin.enabled===false`? n/a : preset.web (default true); writerTemperature = `request.temperature` ?? preset.temperature; writerMaxTokens = `request.max_tokens` ?? preset.maxTokens; panel/judge temperature = preset.temperature; maxToolCalls = `plugin.max_tool_calls` ?? defaults.maxToolCalls; bypass = `plugin.enabled===false`.
 
 `ExecutionPlan`: `{ runId, panel[], judge, writer, web, bypass, maxToolCalls, panelTemperature?, judgeTemperature?, writerTemperature?, writerMaxTokens?, panelSystem?, judgeSystem?, writerSystem?, presetName?, messages }`.
 
-**Tests (table-driven):** default `{model:"fusion"}` → general-high plan; `analysis_models` overrides preset & beats preset panel; `plugin.model` = judge; concrete top `model` = writer, plugin.model = judge (the §6.8 example); `enabled:false` → bypass; preset+analysis_models → analysis_models wins; every validation error code; `max_tool_calls:0`/`-1`/`1.5` → invalid; empty messages → invalid.
+**Tests (table-driven):** default `{model:"fusionix"}` → general-high plan; `analysis_models` overrides preset & beats preset panel; `plugin.model` = judge; concrete top `model` = writer, plugin.model = judge (the §6.8 example); `enabled:false` → bypass; preset+analysis_models → analysis_models wins; every validation error code; `max_tool_calls:0`/`-1`/`1.5` → invalid; empty messages → invalid.
 
 **Commit:** `feat(core): request normalization and validation (§6.8)`
 
@@ -137,7 +137,7 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 
 ## Task 6 — Gateway client (`gateway/openrouter.ts`, `gateway/web.ts`)
 
-`OpenRouterGateway({ apiKey, baseUrl, fetch?, referer?, title?, categories? })`. `chat(req, {signal}): Promise<GatewayCallResult>` POSTs `{gateway}/chat/completions` with `{model, messages, temperature?, max_tokens?, stream:false, usage:{include:true}}`, headers `Authorization: Bearer`, optional `HTTP-Referer`/`X-OpenRouter-Title`/`X-Title`/`X-OpenRouter-Categories`. Returns `{ content, usage:{prompt_tokens,completion_tokens,total_tokens,cost?}, raw, id }`. Non-2xx → `FusionError("gateway_error")` (never leak key/auth state). `listModels()` + `getGeneration(id)` best-effort (catch → undefined). `web.ts`: `applyWeb(model, web)` → `web? model+":online" : model`.
+`OpenRouterGateway({ apiKey, baseUrl, fetch?, referer?, title?, categories? })`. `chat(req, {signal}): Promise<GatewayCallResult>` POSTs `{gateway}/chat/completions` with `{model, messages, temperature?, max_tokens?, stream:false, usage:{include:true}}`, headers `Authorization: Bearer`, optional `HTTP-Referer`/`X-OpenRouter-Title`/`X-Title`/`X-OpenRouter-Categories`. Returns `{ content, usage:{prompt_tokens,completion_tokens,total_tokens,cost?}, raw, id }`. Non-2xx → `FusionixError("gateway_error")` (never leak key/auth state). `listModels()` + `getGeneration(id)` best-effort (catch → undefined). `web.ts`: `applyWeb(model, web)` → `web? model+":online" : model`.
 
 **Tests (mock fetch):** request body has `usage.include=true`, model, temperature; headers set when configured; parses content+usage+cost; 401/500 → `gateway_error`; `applyWeb` suffix logic; `listModels`/`getGeneration` swallow errors.
 
@@ -167,7 +167,7 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 
 ## Task 9 — Judge stage (`pipeline/judge.ts`)
 
-`runJudge(plan, prompt, panel, deps): Promise<{analysis, calls}>`. Build judge messages (JUDGE_SYSTEM+presetSystem, user = renderJudgeUser(prompt, renderAnswers(panel))). Call judge model (no web). `extractJson` → validate shape (`coerceAnalysis`: ensure all 6 arrays). On parse fail → **one repair**: re-ask same judge model "convert your previous output to the exact JSON shape" with prev text; parse again. Still fail → `FusionError("judge_failed")`.
+`runJudge(plan, prompt, panel, deps): Promise<{analysis, calls}>`. Build judge messages (JUDGE_SYSTEM+presetSystem, user = renderJudgeUser(prompt, renderAnswers(panel))). Call judge model (no web). `extractJson` → validate shape (`coerceAnalysis`: ensure all 6 arrays). On parse fail → **one repair**: re-ask same judge model "convert your previous output to the exact JSON shape" with prev text; parse again. Still fail → `FusionixError("judge_failed")`.
 
 **Tests (mock):** valid JSON → analysis; messy→repair→valid (2 calls); both fail → `judge_failed`; missing arrays coerced to `[]`; no web on judge call.
 
@@ -177,7 +177,7 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 
 ## Task 10 — Writer stage (`pipeline/writer.ts`)
 
-`runWriter(plan, prompt, analysis, deps): Promise<{answer, call}>`. Messages: WRITER_SYSTEM+presetSystem, user = renderWriterUser(prompt, JSON.stringify(analysis)). Use `writerTemperature`/`writerMaxTokens`; writer no web. Empty content or throw → `FusionError("writer_failed")`.
+`runWriter(plan, prompt, analysis, deps): Promise<{answer, call}>`. Messages: WRITER_SYSTEM+presetSystem, user = renderWriterUser(prompt, JSON.stringify(analysis)). Use `writerTemperature`/`writerMaxTokens`; writer no web. Empty content or throw → `FusionixError("writer_failed")`.
 
 **Tests (mock):** returns content as answer; passes temperature/max_tokens; throw/empty → `writer_failed`.
 
@@ -187,15 +187,15 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 
 ## Task 11 — Orchestration (`pipeline/run.ts`) + `index.ts`
 
-`runFusion(request, opts: { config?, apiKey, fetch?, signal?, now?, randomId?, maxRequestDurationMs?, referer?, title?, categories?, onProgress? }): Promise<FusionRunResult>`.
+`runFusionix(request, opts: { config?, apiKey, fetch?, signal?, now?, randomId?, maxRequestDurationMs?, referer?, title?, categories?, onProgress? }): Promise<FusionixRunResult>`.
 1. `config = opts.config ?? await loadConfig()`. `plan = normalizeRequest(request, config)` (validation here).
 2. Build gateway. Deadline: `AbortController` aborting at `maxRequestDurationMs` (default 180000), linked to `opts.signal`.
 3. **Bypass** (`plan.bypass`): single writer call (caller messages, writer model, web if plan.web). Result extras: `run_id`, `duration_ms`, `web`; omit panel/analysis (§6.7).
 4. Else: `onProgress("panel")` → runPanel. If zero successes → `all_panel_failed`. `onProgress("judge")` → runJudge(survivors). `onProgress("writer")` → runWriter. Deadline → if panel has ≥1 success proceed; judge/writer timeout → respective 502 (§17).
-5. Aggregate cost across all calls. Shape `FusionRunResult`: `{ runId, answer, panel (resolved order), analysis, usage, costUsd|null, durationMs, web: "used"|"off"|"unsupported", maxToolCallsEnforced:false, model: writer }`.
+5. Aggregate cost across all calls. Shape `FusionixRunResult`: `{ runId, answer, panel (resolved order), analysis, usage, costUsd|null, durationMs, web: "used"|"off"|"unsupported", maxToolCallsEnforced:false, model: writer }`.
 6. `web`: `"off"` if `!plan.web`; `"used"` if web requested & a panel call succeeded; `"unsupported"` if requested but all web attempts failed yet pipeline continued.
 
-`index.ts` re-exports `runFusion`, `loadConfig`, `normalizeRequest`, `listPresetsRedacted`, `FusionError`, types.
+`index.ts` re-exports `runFusionix`, `loadConfig`, `normalizeRequest`, `listPresetsRedacted`, `FusionixError`, types.
 
 **Tests (mock fetch, no network):** happy path 3-panel → answer + analysis + panel order + cost summed + web "used"; one panel fails → survives; all fail → `all_panel_failed`; bypass → answer only, no panel/analysis, web "off"; deadline with 1 survivor → proceeds; web=false → "off".
 
@@ -205,15 +205,15 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 
 ## Task 12 — CLI (`packages/cli/src/*`)
 
-`index.ts`: `parseArgs` for all §10.2 flags. Prompt from arg or stdin. Build `FusionChatCompletionRequest` (`model:"fusion"`, plugin from `--preset`/`--panel`/`--judge`/`--writer`/`--max-tool-calls`/`--no-web`). `--local` → `runFusion(req, {apiKey: OPENROUTER_API_KEY, referer, title})`. Non-local in Phase 1 → friendly error: hosted is Phase 2, use `--local`. `--format` text|json|md (default md on TTY, json on pipe). `--show-analysis` includes analysis in md/text. `--log` writes JSONL run record. `--max-cost` warns (best-effort estimate via `listModels`; warn-not-block when price unknown, §8.2). `--stream` streams writer tokens (best-effort SSE) in local mode. `--version`/`--help`.
+`index.ts`: `parseArgs` for all §10.2 flags. Prompt from arg or stdin. Build `FusionixChatCompletionRequest` (`model:"fusionix"`, plugin from `--preset`/`--panel`/`--judge`/`--writer`/`--max-tool-calls`/`--no-web`). `--local` → `runFusionix(req, {apiKey: OPENROUTER_API_KEY, referer, title})`. Non-local in Phase 1 → friendly error: hosted is Phase 2, use `--local`. `--format` text|json|md (default md on TTY, json on pipe). `--show-analysis` includes analysis in md/text. `--log` writes JSONL run record. `--max-cost` warns (best-effort estimate via `listModels`; warn-not-block when price unknown, §8.2). `--stream` streams writer tokens (best-effort SSE) in local mode. `--version`/`--help`.
 
 `format.ts`: `renderMarkdown(result, {showAnalysis})`, `renderText`, `renderJson`. `stdin.ts`: read piped stdin.
 
-**Tests:** parse flags → request shape; `--panel a,b,c` → analysis_models; `--no-web` → plugin web false (via enabled? no—use a `web:false` mapping: CLI sets plugin with web disabled by sending `analysis`? — represent via request: set `--no-web` → we pass `web:false` to runFusion through plan; since request has no web field, CLI passes `web` override through opts). md/json/text rendering; missing key → clear error; non-local → guidance error. (Mock core or run with injected fetch.)
+**Tests:** parse flags → request shape; `--panel a,b,c` → analysis_models; `--no-web` → plugin web false (via enabled? no—use a `web:false` mapping: CLI sets plugin with web disabled by sending `analysis`? — represent via request: set `--no-web` → we pass `web:false` to runFusionix through plan; since request has no web field, CLI passes `web` override through opts). md/json/text rendering; missing key → clear error; non-local → guidance error. (Mock core or run with injected fetch.)
 
 **Commit:** `feat(cli): local deliberation CLI with formats, logging, max-cost`
 
-> Note: `--no-web` — the wire request has no `web` field; CLI maps `--no-web` to the resolved plan via a core option `webOverride`, or by setting the chosen preset's web off. Implement `webOverride?: boolean` on `runFusion` opts (and on normalize) so CLI/SDK can force web off without a preset edit. Default undefined = use preset/plugin.
+> Note: `--no-web` — the wire request has no `web` field; CLI maps `--no-web` to the resolved plan via a core option `webOverride`, or by setting the chosen preset's web off. Implement `webOverride?: boolean` on `runFusionix` opts (and on normalize) so CLI/SDK can force web off without a preset edit. Default undefined = use preset/plugin.
 
 ---
 
@@ -222,7 +222,7 @@ Resolution: panel = `analysis_models` ?? preset.panel; judge = `plugin.model` ??
 `npm run build` (tsc -b, both packages emit dist + .d.ts; verify shebang on cli bin — add `#!/usr/bin/env node` to cli `index.ts`; if tsc drops it, prepend in a tiny postbuild). `npm link` cli (or `node packages/cli/dist/index.js`). Real run (uses `OPENROUTER_API_KEY`, costs a few cents):
 
 ```
-fusion "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-budget --show-analysis
+fusionix "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-budget --show-analysis
 ```
 
 Expected: panel→judge→writer, final answer, `cost_usd` populated, panel in order. Verify acceptance command with `general-high` too (smaller prompt to bound cost). Capture output to confirm §18 Phase-1 "done" criteria.
@@ -233,7 +233,7 @@ Expected: panel→judge→writer, final answer, `cost_usd` populated, panel in o
 
 ## Task 14 — Docs + review
 
-Root `README.md`: what Fusion is (§20 one-liner), Phase-1 status, install/build, `--local` usage, config + env, the §6.4 line. `packages/core/README.md` + `packages/cli/README.md` brief. Run `superpowers:requesting-code-review` (code-reviewer agent) against the plan; address findings. `superpowers:verification-before-completion` before declaring done.
+Root `README.md`: what Fusionix is (§20 one-liner), Phase-1 status, install/build, `--local` usage, config + env, the §6.4 line. `packages/core/README.md` + `packages/cli/README.md` brief. Run `superpowers:requesting-code-review` (code-reviewer agent) against the plan; address findings. `superpowers:verification-before-completion` before declaring done.
 
 **Commit:** `docs: Phase 1 readme + usage`
 
@@ -243,5 +243,5 @@ Root `README.md`: what Fusion is (§20 one-liner), Phase-1 status, install/build
 
 - `npm test` green (all core + cli unit tests, mocked gateway).
 - `npm run build` clean (no type errors).
-- `fusion "…" --local --preset general-high` runs panel→judge→writer, returns an answer, `cost_usd` populated from gateway usage, panel in resolved order, caller system messages preserved, panel/judge parse-failure rules per §14.
+- `fusionix "…" --local --preset general-high` runs panel→judge→writer, returns an answer, `cost_usd` populated from gateway usage, panel in resolved order, caller system messages preserved, panel/judge parse-failure rules per §14.
 - No slugs in core logic (only in `config/default.config.json`). No secrets logged.

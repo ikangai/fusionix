@@ -5,20 +5,20 @@
  */
 import { writeFile } from "node:fs/promises";
 import {
-  runFusion as defaultRunFusion,
+  runFusionix as defaultRunFusionix,
   loadConfig as defaultLoadConfig,
   normalizeRequest,
   estimateCost,
   toChatCompletion,
-  isFusionError,
+  isFusionixError,
   OpenRouterGateway,
-} from "@ikangai/fusion-core";
+} from "@ikangai/fusionix-core";
 import type {
-  FusionChatCompletionRequest,
-  FusionConfig,
+  FusionixChatCompletionRequest,
+  FusionixConfig,
   PriceEntry,
-  RunFusionOptions,
-} from "@ikangai/fusion-core";
+  RunFusionixOptions,
+} from "@ikangai/fusionix-core";
 import { parseCliArgs } from "./args.ts";
 import type { OutputFormat } from "./args.ts";
 import { buildRequest } from "./request.ts";
@@ -27,11 +27,11 @@ import { readStdin as defaultReadStdin } from "./stdin.ts";
 
 const DEFAULT_VERSION = "0.1.0";
 
-const HELP = `fusion — multi-model deliberation (panel → judge → writer)
+const HELP = `fusionix — multi-model deliberation (panel → judge → writer)
 
 Usage:
-  fusion [prompt] [options]
-  cat file | fusion --local --preset research-high
+  fusionix [prompt] [options]
+  cat file | fusionix --local --preset research-high
 
 Options:
   --preset <slug>         general-high, general-budget, research-high, research-budget,
@@ -58,8 +58,8 @@ export interface MainDeps {
   env?: Record<string, string | undefined>;
   isTTY?: boolean;
   readStdin?: () => Promise<string>;
-  runFusion?: (request: FusionChatCompletionRequest, opts: RunFusionOptions) => Promise<import("@ikangai/fusion-core").FusionRunResult>;
-  loadConfig?: () => Promise<FusionConfig>;
+  runFusionix?: (request: FusionixChatCompletionRequest, opts: RunFusionixOptions) => Promise<import("@ikangai/fusionix-core").FusionixRunResult>;
+  loadConfig?: () => Promise<FusionixConfig>;
   loadPrices?: (apiKey: string, baseUrl?: string) => Promise<Record<string, PriceEntry>>;
   stdout?: (s: string) => void;
   stderr?: (s: string) => void;
@@ -72,7 +72,7 @@ function errMessage(e: unknown): string {
 }
 
 function errCodeSuffix(e: unknown): string {
-  return isFusionError(e) ? ` (${e.code})` : "";
+  return isFusionixError(e) ? ` (${e.code})` : "";
 }
 
 async function defaultLoadPrices(apiKey: string, baseUrl?: string): Promise<Record<string, PriceEntry>> {
@@ -92,7 +92,7 @@ async function defaultLoadPrices(apiKey: string, baseUrl?: string): Promise<Reco
 /** Returns true if the run should be aborted due to --max-cost. Best-effort (§8.2). */
 async function checkMaxCost(
   maxCost: number,
-  request: FusionChatCompletionRequest,
+  request: FusionixChatCompletionRequest,
   webOverride: boolean | undefined,
   prompt: string,
   apiKey: string,
@@ -109,19 +109,19 @@ async function checkMaxCost(
     const prices = await (deps.loadPrices ?? defaultLoadPrices)(apiKey, config.gateway);
     const { estimateUsd, missing } = estimateCost(plan, prices, { promptChars: prompt.length });
     if (missing.length > 0) {
-      stderr(`fusion: --max-cost: price unknown for ${missing.join(", ")}; cannot enforce pre-flight. Proceeding.\n`);
+      stderr(`fusionix: --max-cost: price unknown for ${missing.join(", ")}; cannot enforce pre-flight. Proceeding.\n`);
       return false;
     }
     if (estimateUsd !== null && estimateUsd > maxCost) {
-      stderr(`fusion: estimated cost $${estimateUsd.toFixed(4)} exceeds --max-cost $${maxCost.toFixed(4)}. Aborting.\n`);
+      stderr(`fusionix: estimated cost $${estimateUsd.toFixed(4)} exceeds --max-cost $${maxCost.toFixed(4)}. Aborting.\n`);
       return true;
     }
     if (estimateUsd !== null) {
-      stderr(`fusion: estimated cost $${estimateUsd.toFixed(4)} (max $${maxCost.toFixed(4)}).\n`);
+      stderr(`fusionix: estimated cost $${estimateUsd.toFixed(4)} (max $${maxCost.toFixed(4)}).\n`);
     }
     return false;
   } catch (e) {
-    stderr(`fusion: --max-cost estimate unavailable (${errMessage(e)}). Proceeding.\n`);
+    stderr(`fusionix: --max-cost estimate unavailable (${errMessage(e)}). Proceeding.\n`);
     return false;
   }
 }
@@ -130,14 +130,14 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   const env = deps.env ?? process.env;
   const stdout = deps.stdout ?? ((s) => void process.stdout.write(s));
   const stderr = deps.stderr ?? ((s) => void process.stderr.write(s));
-  const run = deps.runFusion ?? defaultRunFusion;
+  const run = deps.runFusionix ?? defaultRunFusionix;
   const version = deps.version ?? DEFAULT_VERSION;
 
   let args;
   try {
     args = parseCliArgs(argv);
   } catch (e) {
-    stderr(`fusion: ${errMessage(e)}\n`);
+    stderr(`fusionix: ${errMessage(e)}\n`);
     return 2;
   }
 
@@ -150,7 +150,7 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
     return 0;
   }
   if (args.format && !["text", "json", "md"].includes(args.format)) {
-    stderr(`fusion: invalid --format '${args.format}' (expected text|json|md)\n`);
+    stderr(`fusionix: invalid --format '${args.format}' (expected text|json|md)\n`);
     return 2;
   }
 
@@ -161,25 +161,25 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
     if (piped) prompt = piped;
   }
   if (!prompt) {
-    stderr("fusion: no prompt provided (pass a prompt argument or pipe text on stdin)\n");
+    stderr("fusionix: no prompt provided (pass a prompt argument or pipe text on stdin)\n");
     return 2;
   }
 
   // Phase 1: only --local is functional.
   if (!args.local) {
     stderr(
-      "fusion: hosted mode is not available yet (Phase 1). Re-run with --local to run the pipeline locally using OPENROUTER_API_KEY.\n",
+      "fusionix: hosted mode is not available yet (Phase 1). Re-run with --local to run the pipeline locally using OPENROUTER_API_KEY.\n",
     );
     return 2;
   }
 
   const apiKey = env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    stderr("fusion: OPENROUTER_API_KEY is not set (required for --local mode).\n");
+    stderr("fusionix: OPENROUTER_API_KEY is not set (required for --local mode).\n");
     return 1;
   }
   if (args.apiUrl) {
-    stderr("fusion: --api-url is ignored in --local mode (it targets the hosted API, Phase 2).\n");
+    stderr("fusionix: --api-url is ignored in --local mode (it targets the hosted API, Phase 2).\n");
   }
 
   const { request, webOverride } = buildRequest(args, prompt);
@@ -191,11 +191,11 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
     if (abort) return 1;
   }
 
-  const runOpts: RunFusionOptions = { apiKey };
+  const runOpts: RunFusionixOptions = { apiKey };
   if (webOverride !== undefined) runOpts.webOverride = webOverride;
-  if (env.FUSION_HTTP_REFERER) runOpts.referer = env.FUSION_HTTP_REFERER;
-  if (env.FUSION_APP_TITLE) runOpts.title = env.FUSION_APP_TITLE;
-  if (isTTY) runOpts.onProgress = (stage) => stderr(`[fusion] ${stage}…\n`);
+  if (env.FUSIONIX_HTTP_REFERER) runOpts.referer = env.FUSIONIX_HTTP_REFERER;
+  if (env.FUSIONIX_APP_TITLE) runOpts.title = env.FUSIONIX_APP_TITLE;
+  if (isTTY) runOpts.onProgress = (stage) => stderr(`[fusionix] ${stage}…\n`);
 
   const streaming = args.stream && format !== "json";
   let streamedAny = false;
@@ -210,7 +210,7 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   try {
     result = await run(request, runOpts);
   } catch (e) {
-    stderr(`fusion: ${errMessage(e)}${errCodeSuffix(e)}\n`);
+    stderr(`fusionix: ${errMessage(e)}${errCodeSuffix(e)}\n`);
     return 1;
   }
 
@@ -236,7 +236,7 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
       };
       await (deps.writeFile ?? writeFile)(args.log, JSON.stringify(record) + "\n");
     } catch (e) {
-      stderr(`fusion: could not write log to ${args.log}: ${errMessage(e)}\n`);
+      stderr(`fusionix: could not write log to ${args.log}: ${errMessage(e)}\n`);
     }
   }
 

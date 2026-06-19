@@ -1,16 +1,16 @@
 {
-  "name": "@ikangai/fusion-cli",
+  "name": "@ikangai/fusionix-cli",
   "version": "0.1.0",
   "type": "module",
-  "description": "Fusion CLI — run multi-model deliberation from the terminal (hosted or --local).",
+  "description": "Fusionix CLI — run multi-model deliberation from the terminal (hosted or --local).",
   "bin": {
-    "fusion": "./dist/index.js"
+    "fusionix": "./dist/index.js"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@ikangai/fusion-core": "0.1.0"
+    "@ikangai/fusionix-core": "0.1.0"
   },
   "engines": {
     "node": ">=18"

@@ -1,8 +1,8 @@
-# Fusion
+# Fusionix
 
-> Fusion gives hard questions a second, third, and fourth opinion. It runs a panel of models, asks a judge to compare their answers, and gives you one synthesized result — available as an API, CLI, SDK, or Claude skill.
+> Fusionix gives hard questions a second, third, and fourth opinion. It runs a panel of models, asks a judge to compare their answers, and gives you one synthesized result — available as an API, CLI, SDK, or Claude skill.
 
-Fusion is an OpenRouter-shaped multi-model deliberation engine. It sends your prompt to several models in parallel, asks a judge model to compare the answers, and asks a writer model to produce one synthesized response.
+Fusionix is an OpenRouter-shaped multi-model deliberation engine. It sends your prompt to several models in parallel, asks a judge model to compare the answers, and asks a writer model to produce one synthesized response.
 
 ```text
 user request
@@ -12,7 +12,7 @@ user request
 → result returned to caller
 ```
 
-**OpenAI-compatible for the answer, Fusion-shaped for the extras.** A stock OpenAI client pointed at the endpoint with `model: "fusion"` gets the final answer in `choices[0].message.content`. The panel answers and judge analysis ride in a non-standard `fusion` field — reachable via the Fusion SDK or by reading the raw JSON.
+**OpenAI-compatible for the answer, Fusionix-shaped for the extras.** A stock OpenAI client pointed at the endpoint with `model: "fusionix"` gets the final answer in `choices[0].message.content`. The panel answers and judge analysis ride in a non-standard `fusionix` field — reachable via the Fusionix SDK or by reading the raw JSON.
 
 ---
 
@@ -23,7 +23,7 @@ user request
 - `packages/core` — request normalization, the panel → judge → writer pipeline, single-model bypass, cost tracking, and result shaping. No web server, CLI, or UI code.
 - `packages/cli` — a thin terminal wrapper. In Phase 1 it runs in `--local` mode, calling the gateway directly with your own `OPENROUTER_API_KEY`.
 
-The hosted API, authentication and key storage, the SDK, the Claude skill, and the landing page arrive in later phases (see `fusion-spec.md` §18). Until then, `fusion` requires `--local`.
+The hosted API, authentication and key storage, the SDK, the Claude skill, and the landing page arrive in later phases (see `fusionix-spec.md` §18). Until then, `fusionix` requires `--local`.
 
 ---
 
@@ -41,10 +41,10 @@ npm run build      # tsc -b → dist/ + .d.ts for both packages
 npm test           # full unit-test suite, mocked gateway, no network
 ```
 
-Make the `fusion` command available on your PATH:
+Make the `fusionix` command available on your PATH:
 
 ```bash
-cd packages/cli && npm link    # then `fusion --help`
+cd packages/cli && npm link    # then `fusionix --help`
 ```
 
 …or run the built bin directly: `node packages/cli/dist/index.js --help`.
@@ -54,12 +54,12 @@ cd packages/cli && npm link    # then `fusion --help`
 ```bash
 export OPENROUTER_API_KEY=sk-or-...
 
-fusion "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-high
-fusion "Review this architecture" --local --preset architecture-review --show-analysis
-cat spec.md | fusion --local --preset research-high
+fusionix "Compare SQLite and Postgres for lightweight agent coordination." --local --preset general-high
+fusionix "Review this architecture" --local --preset architecture-review --show-analysis
+cat spec.md | fusionix --local --preset research-high
 ```
 
-Key options (`fusion --help` for the full list):
+Key options (`fusionix --help` for the full list):
 
 | Option | Meaning |
 |---|---|
@@ -86,16 +86,16 @@ Three sequential stages over large models commonly take **30–90 seconds**, and
 
 Model slugs are **data, not code**: they live in `packages/core/config/default.config.json` (verified against `GET {gateway}/models`; model IDs drift, so re-verify before deploying). Core never hard-codes slugs.
 
-Resolution order: bundled default → external file (`FUSION_CONFIG`, or `fusion.config.json` in the working directory) → environment overrides.
+Resolution order: bundled default → external file (`FUSIONIX_CONFIG`, or `fusionix.config.json` in the working directory) → environment overrides.
 
 Environment variables used in Phase 1:
 
 ```text
 OPENROUTER_API_KEY      # gateway calls in --local mode
-FUSION_DEFAULT_GATEWAY  # override the gateway base URL
-FUSION_DEFAULT_PRESET   # override the default preset
-FUSION_HTTP_REFERER     # optional OpenRouter attribution
-FUSION_APP_TITLE        # optional OpenRouter attribution
+FUSIONIX_DEFAULT_GATEWAY  # override the gateway base URL
+FUSIONIX_DEFAULT_PRESET   # override the default preset
+FUSIONIX_HTTP_REFERER     # optional OpenRouter attribution
+FUSIONIX_APP_TITLE        # optional OpenRouter attribution
 ```
 
 ## Architecture
@@ -114,4 +114,4 @@ The same core powers the CLI, the SDK, and the hosted API, so all surfaces behav
 
 ---
 
-Built by [IKANGAI](https://ikangai.com). See `fusion-spec.md` for the full specification.
+Built by [IKANGAI](https://ikangai.com). See `fusionix-spec.md` for the full specification.
