@@ -12,25 +12,20 @@ import { FusionixError } from "../errors.ts";
 import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
 import { normalizeRequest } from "../normalize.ts";
-import { applyWeb } from "../gateway/web.ts";
+import { webStatus } from "../gateway/web.ts";
 import { OpenRouterGateway } from "../gateway/openrouter.ts";
-import { makeChatRequest } from "../gateway/contract.ts";
 import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
-import { runWriter, consumeStream } from "./writer.ts";
-import { chatWithWebFallback } from "./web-call.ts";
-import type { WebCallOptions } from "./web-call.ts";
+import { runWriter } from "./writer.ts";
+import { runBypass } from "./bypass.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
-  ExecutionPlan,
   FusionixChatCompletionRequest,
   FusionixConfig,
   FusionixRunResult,
   FusionixStage,
-  GatewayCallResult,
   PanelResponse,
-  WebStatus,
 } from "../types.ts";
 
 const DEFAULT_MAX_REQUEST_DURATION_MS = 180_000;
@@ -74,13 +69,6 @@ function buildGateway(config: FusionixConfig, opts: RunFusionixOptions): ChatGat
   if (opts.title) clientOpts.title = opts.title;
   if (opts.categories) clientOpts.categories = opts.categories;
   return new OpenRouterGateway(clientOpts);
-}
-
-function resolveWebStatus(plan: ExecutionPlan, webUsed: boolean): WebStatus {
-  if (!plan.web) return "off";
-  // web requested: "used" if the :online mechanism actually served a member,
-  // "unsupported" if every successful member had to fall back to no-web (§15).
-  return webUsed ? "used" : "unsupported";
 }
 
 export async function runFusionix(
@@ -149,7 +137,7 @@ export async function runFusionix(
       usage,
       costUsd,
       durationMs: now() - startedAt,
-      web: resolveWebStatus(plan, webUsed),
+      web: webStatus(plan.web, webUsed),
       maxToolCallsEnforced: false,
       created: Math.floor(startedAt / 1000),
     };
@@ -158,56 +146,6 @@ export async function runFusionix(
     clearTimeout(timer);
     if (opts.signal) opts.signal.removeEventListener("abort", onCallerAbort);
   }
-}
-
-async function runBypass(
-  plan: ExecutionPlan,
-  deps: { gateway: ChatGateway; signal: AbortSignal },
-  opts: RunFusionixOptions,
-  startedAt: number,
-  now: () => number,
-): Promise<FusionixRunResult> {
-  opts.onProgress?.("writer");
-
-  let call: GatewayCallResult;
-  let usedWeb = false;
-  try {
-    if (opts.onWriterDelta && deps.gateway.streamChat) {
-      // Streaming bypass uses :online when web is on; no fallback while streaming.
-      const req = makeChatRequest(applyWeb(plan.writer, plan.web), plan.messages, {
-        temperature: plan.writerTemperature,
-        maxTokens: plan.writerMaxTokens,
-      });
-      call = await consumeStream(deps.gateway.streamChat(req, { signal: deps.signal }), opts.onWriterDelta);
-      usedWeb = plan.web;
-    } else {
-      const webOpts: WebCallOptions = { web: plan.web, signal: deps.signal };
-      if (plan.writerTemperature !== undefined) webOpts.temperature = plan.writerTemperature;
-      if (plan.writerMaxTokens !== undefined) webOpts.maxTokens = plan.writerMaxTokens;
-      const out = await chatWithWebFallback(deps.gateway, plan.writer, plan.messages, webOpts);
-      call = out.result;
-      usedWeb = out.usedWeb;
-    }
-  } catch (cause) {
-    throw new FusionixError("writer_failed", "Single-model call failed.", { cause, runId: plan.runId });
-  }
-  if (!call.content || call.content.trim().length === 0) {
-    throw new FusionixError("writer_failed", "Single-model call returned an empty answer.", { runId: plan.runId });
-  }
-
-  const { usage, costUsd } = await finalizeCost(deps.gateway, [call]);
-  // §6.7: extras carry only run_id, duration_ms and web; omit panel/analysis.
-  return {
-    runId: plan.runId,
-    answer: call.content,
-    model: plan.writer,
-    usage,
-    costUsd,
-    durationMs: now() - startedAt,
-    web: resolveWebStatus(plan, usedWeb),
-    maxToolCallsEnforced: false,
-    created: Math.floor(startedAt / 1000),
-  };
 }
 
 // Re-export PanelResponse for consumers importing from run.ts (type convenience).

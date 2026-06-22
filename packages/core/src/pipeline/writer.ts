@@ -8,7 +8,7 @@
  */
 import { FusionixError } from "../errors.ts";
 import { WRITER_SYSTEM, composeSystem, renderWriterUser } from "../prompts.ts";
-import { makeChatRequest } from "../gateway/contract.ts";
+import { makeChatRequest, consumeStream } from "../gateway/contract.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { ExecutionPlan, FusionixAnalysis, GatewayCallResult } from "../types.ts";
 
@@ -22,18 +22,6 @@ export interface WriterDeps {
 export interface WriterOutcome {
   answer: string;
   call: GatewayCallResult;
-}
-
-export async function consumeStream(
-  gen: AsyncGenerator<string, GatewayCallResult, void>,
-  onDelta: (delta: string) => void,
-): Promise<GatewayCallResult> {
-  let next = await gen.next();
-  while (!next.done) {
-    onDelta(next.value);
-    next = await gen.next();
-  }
-  return next.value;
 }
 
 export async function runWriter(

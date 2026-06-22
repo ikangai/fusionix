@@ -40,3 +40,21 @@ export function makeChatRequest(
   if (opts.maxTokens !== undefined) req.maxTokens = opts.maxTokens;
   return req;
 }
+
+/**
+ * Drain a streaming chat generator: forward each content delta to `onDelta` and
+ * return the final accumulated result (with usage). Shared by the streaming
+ * writer stage and the streaming single-model bypass — it operates purely on the
+ * port's `streamChat` return type, so it belongs with the contract, not a stage.
+ */
+export async function consumeStream(
+  gen: AsyncGenerator<string, GatewayCallResult, void>,
+  onDelta: (delta: string) => void,
+): Promise<GatewayCallResult> {
+  let next = await gen.next();
+  while (!next.done) {
+    onDelta(next.value);
+    next = await gen.next();
+  }
+  return next.value;
+}
