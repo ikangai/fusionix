@@ -7,7 +7,7 @@
  * judge (which then fails if no time remains), distinguishing all_panel_failed
  * from judge_failed (§17).
  */
-import { aggregateUsage } from "../cost.ts";
+import { finalizeCost } from "../cost.ts";
 import { FusionixError } from "../errors.ts";
 import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
@@ -76,30 +76,6 @@ function buildGateway(config: FusionixConfig, opts: RunFusionixOptions): ChatGat
   return new OpenRouterGateway(clientOpts);
 }
 
-/**
- * Best-effort cost backfill (§8.1). For any call that has a generation id but no
- * reported cost (e.g. a streamed call whose gateway omitted the usage chunk),
- * look the cost up via `/generation`. Never blocks the run; failures are ignored.
- */
-async function backfillCosts(gateway: ChatGateway, calls: GatewayCallResult[]): Promise<void> {
-  if (!gateway.getGeneration) return;
-  const lookup = gateway.getGeneration.bind(gateway);
-  await Promise.all(
-    calls.map(async (call) => {
-      if (!call.id || (call.usage && typeof call.usage.cost === "number")) return;
-      try {
-        const gen = await lookup(call.id);
-        if (gen && typeof gen.cost === "number") {
-          if (call.usage) call.usage.cost = gen.cost;
-          else call.usage = { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost: gen.cost };
-        }
-      } catch {
-        // best-effort; ignore
-      }
-    }),
-  );
-}
-
 function resolveWebStatus(plan: ExecutionPlan, webUsed: boolean): WebStatus {
   if (!plan.web) return "off";
   // web requested: "used" if the :online mechanism actually served a member,
@@ -162,8 +138,7 @@ export async function runFusionix(
     const { answer, call: writerCall } = await runWriter(plan, prompt, analysis, writerDeps);
 
     const allCalls = [...panelCalls, ...judgeCalls, writerCall];
-    await backfillCosts(deps.gateway, allCalls);
-    const { usage, costUsd } = aggregateUsage(allCalls);
+    const { usage, costUsd } = await finalizeCost(deps.gateway, allCalls);
     const result: FusionixRunResult = {
       runId: plan.runId,
       answer,
@@ -220,8 +195,7 @@ async function runBypass(
     throw new FusionixError("writer_failed", "Single-model call returned an empty answer.", { runId: plan.runId });
   }
 
-  await backfillCosts(deps.gateway, [call]);
-  const { usage, costUsd } = aggregateUsage([call]);
+  const { usage, costUsd } = await finalizeCost(deps.gateway, [call]);
   // §6.7: extras carry only run_id, duration_ms and web; omit panel/analysis.
   return {
     runId: plan.runId,
