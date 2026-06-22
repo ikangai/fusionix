@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import {
   contentToString,
   foldRoles,
-  findLastUserMessage,
   hasUserMessage,
   renderCompactPrompt,
   prependSystem,
@@ -34,13 +33,12 @@ test("foldRoles maps developer→system and does not mutate the input", () => {
   assert.equal(input[0]!.role, "developer", "input not mutated");
 });
 
-test("findLastUserMessage / hasUserMessage", () => {
+test("hasUserMessage detects whether any turn is from the user", () => {
   const msgs: ChatMessage[] = [
     { role: "user", content: "first" },
     { role: "assistant", content: "mid" },
     { role: "user", content: "last" },
   ];
-  assert.equal(findLastUserMessage(msgs)?.content, "last");
   assert.equal(hasUserMessage(msgs), true);
   assert.equal(hasUserMessage([{ role: "assistant", content: "x" }]), false);
 });

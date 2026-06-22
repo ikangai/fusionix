@@ -32,13 +32,6 @@ export function foldRoles(messages: ChatMessage[]): ChatMessage[] {
   return messages.map((m) => (m.role === "developer" ? { ...m, role: "system" as const } : { ...m }));
 }
 
-export function findLastUserMessage(messages: ChatMessage[]): ChatMessage | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i]!.role === "user") return messages[i];
-  }
-  return undefined;
-}
-
 export function hasUserMessage(messages: ChatMessage[]): boolean {
   return messages.some((m) => m.role === "user");
 }

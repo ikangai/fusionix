@@ -25,7 +25,6 @@ import type {
   FusionixConfig,
   FusionixRunResult,
   FusionixStage,
-  PanelResponse,
 } from "../types.ts";
 
 const DEFAULT_MAX_REQUEST_DURATION_MS = 180_000;
@@ -147,6 +146,3 @@ export async function runFusionix(
     if (opts.signal) opts.signal.removeEventListener("abort", onCallerAbort);
   }
 }
-
-// Re-export PanelResponse for consumers importing from run.ts (type convenience).
-export type { PanelResponse };
