@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runFusionix } from "../src/pipeline/run.ts";
 import { isFusionixError } from "../src/errors.ts";
-import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
+import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/contract.ts";
 import type { FusionixConfig, FusionixStage, GatewayCallResult } from "../src/types.ts";
 
 const VALID_ANALYSIS = JSON.stringify({

@@ -11,7 +11,7 @@ import { prependSystem } from "../messages.ts";
 import { PANEL_SYSTEM, composeSystem } from "../prompts.ts";
 import { chatWithWebFallback } from "./web-call.ts";
 import type { WebCallOptions } from "./web-call.ts";
-import type { ChatGateway } from "../gateway/openrouter.ts";
+import type { ChatGateway } from "../gateway/contract.ts";
 import type { Citation, ExecutionPlan, GatewayCallResult, PanelResponse } from "../types.ts";
 
 export interface PanelDeps {

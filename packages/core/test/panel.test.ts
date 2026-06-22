@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { runPanel } from "../src/pipeline/panel.ts";
 import { PANEL_SYSTEM } from "../src/prompts.ts";
 import { FusionixError } from "../src/errors.ts";
-import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
+import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/contract.ts";
 import type { ExecutionPlan, GatewayCallResult } from "../src/types.ts";
 
 function makePlan(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {

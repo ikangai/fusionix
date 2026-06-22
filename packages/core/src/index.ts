@@ -23,14 +23,9 @@ export type { ChatCompletionResponse, FusionixExtrasWire, WirePanelEntry, WireAn
 export { FusionixError, isFusionixError, FUSIONIX_ERROR_HTTP_STATUS } from "./errors.ts";
 export type { FusionixErrorCode, FusionixErrorOptions } from "./errors.ts";
 
+export type { ChatGateway, ChatRequest, ChatCallOptions } from "./gateway/contract.ts";
+
 export { OpenRouterGateway } from "./gateway/openrouter.ts";
-export type {
-  ChatGateway,
-  ChatRequest,
-  ChatCallOptions,
-  GatewayClientOptions,
-  GatewayModel,
-  GenerationCost,
-} from "./gateway/openrouter.ts";
+export type { GatewayClientOptions, GatewayModel, GenerationCost } from "./gateway/openrouter.ts";
 
 export * from "./types.ts";

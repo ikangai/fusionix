@@ -8,7 +8,8 @@
  */
 import { FusionixError } from "../errors.ts";
 import { contentToString } from "../messages.ts";
-import type { ChatMessage, GatewayCallResult, GatewayUsage } from "../types.ts";
+import type { ChatGateway, ChatRequest, ChatCallOptions } from "./contract.ts";
+import type { GatewayCallResult, GatewayUsage } from "../types.ts";
 
 export interface GatewayClientOptions {
   apiKey: string;
@@ -19,38 +20,6 @@ export interface GatewayClientOptions {
   referer?: string;
   title?: string;
   categories?: string;
-}
-
-export interface ChatRequest {
-  model: string;
-  messages: ChatMessage[];
-  temperature?: number;
-  maxTokens?: number;
-}
-
-export interface ChatCallOptions {
-  signal?: AbortSignal;
-}
-
-/** Build a ChatRequest, including temperature/maxTokens only when defined. */
-export function makeChatRequest(
-  model: string,
-  messages: ChatMessage[],
-  opts: { temperature?: number; maxTokens?: number } = {},
-): ChatRequest {
-  const req: ChatRequest = { model, messages };
-  if (opts.temperature !== undefined) req.temperature = opts.temperature;
-  if (opts.maxTokens !== undefined) req.maxTokens = opts.maxTokens;
-  return req;
-}
-
-/** Minimal gateway surface the pipeline stages depend on (lets tests inject fakes). */
-export interface ChatGateway {
-  chat(req: ChatRequest, opts?: ChatCallOptions): Promise<GatewayCallResult>;
-  /** Optional streaming variant; yields content deltas, returns the final result. */
-  streamChat?(req: ChatRequest, opts?: ChatCallOptions): AsyncGenerator<string, GatewayCallResult, void>;
-  /** Optional best-effort cost lookup for backfill (§8.1). */
-  getGeneration?(id: string): Promise<{ cost?: number } | undefined>;
 }
 
 export interface GatewayModel {
@@ -78,7 +47,7 @@ function toUsage(raw: unknown): GatewayUsage | undefined {
   return usage;
 }
 
-export class OpenRouterGateway {
+export class OpenRouterGateway implements ChatGateway {
   private readonly apiKey: string;
   private readonly base: string;
   private readonly doFetch: typeof fetch;

@@ -8,8 +8,8 @@
  * a genuine model failure and propagates.
  */
 import { applyWeb } from "../gateway/web.ts";
-import { makeChatRequest } from "../gateway/openrouter.ts";
-import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
+import { makeChatRequest } from "../gateway/contract.ts";
+import type { ChatGateway, ChatRequest } from "../gateway/contract.ts";
 import type { GatewayCallResult } from "../types.ts";
 
 export interface WebCallOptions {

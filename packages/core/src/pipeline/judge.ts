@@ -9,8 +9,8 @@
 import { FusionixError } from "../errors.ts";
 import { extractJson } from "../json.ts";
 import { JUDGE_SYSTEM, composeSystem, renderAnswers, renderJudgeUser } from "../prompts.ts";
-import { makeChatRequest } from "../gateway/openrouter.ts";
-import type { ChatGateway, ChatRequest } from "../gateway/openrouter.ts";
+import { makeChatRequest } from "../gateway/contract.ts";
+import type { ChatGateway, ChatRequest } from "../gateway/contract.ts";
 import type {
   Contradiction,
   ExecutionPlan,

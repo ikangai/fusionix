@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runJudge } from "../src/pipeline/judge.ts";
 import { isFusionixError } from "../src/errors.ts";
-import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
+import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/contract.ts";
 import type { ExecutionPlan, GatewayCallResult, PanelResponse } from "../src/types.ts";
 
 function makePlan(overrides: Partial<ExecutionPlan> = {}): ExecutionPlan {

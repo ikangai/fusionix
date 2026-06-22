@@ -13,13 +13,15 @@ import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
 import { normalizeRequest } from "../normalize.ts";
 import { applyWeb } from "../gateway/web.ts";
-import { OpenRouterGateway, makeChatRequest } from "../gateway/openrouter.ts";
+import { OpenRouterGateway } from "../gateway/openrouter.ts";
+import { makeChatRequest } from "../gateway/contract.ts";
 import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
 import { runWriter, consumeStream } from "./writer.ts";
 import { chatWithWebFallback } from "./web-call.ts";
 import type { WebCallOptions } from "./web-call.ts";
-import type { ChatGateway, GatewayClientOptions } from "../gateway/openrouter.ts";
+import type { ChatGateway } from "../gateway/contract.ts";
+import type { GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
   ExecutionPlan,
   FusionixChatCompletionRequest,

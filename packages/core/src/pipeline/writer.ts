@@ -8,8 +8,8 @@
  */
 import { FusionixError } from "../errors.ts";
 import { WRITER_SYSTEM, composeSystem, renderWriterUser } from "../prompts.ts";
-import { makeChatRequest } from "../gateway/openrouter.ts";
-import type { ChatGateway } from "../gateway/openrouter.ts";
+import { makeChatRequest } from "../gateway/contract.ts";
+import type { ChatGateway } from "../gateway/contract.ts";
 import type { ExecutionPlan, FusionixAnalysis, GatewayCallResult } from "../types.ts";
 
 export interface WriterDeps {

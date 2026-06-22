@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { chatWithWebFallback } from "../src/pipeline/web-call.ts";
-import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/openrouter.ts";
+import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/contract.ts";
 import type { GatewayCallResult } from "../src/types.ts";
 
 function gw(handler: (model: string, req: ChatRequest) => GatewayCallResult) {
