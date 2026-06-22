@@ -3,7 +3,7 @@
  * arrives in Phase 2). Returns a process exit code; all I/O is injectable so the
  * flow is testable without a network or a real TTY.
  */
-import { writeFile } from "node:fs/promises";
+import { appendFile } from "node:fs/promises";
 import {
   runFusionix as defaultRunFusionix,
   loadConfig as defaultLoadConfig,
@@ -46,7 +46,7 @@ Options:
   --local                 Run locally against OPENROUTER_API_KEY (required in Phase 1)
   --stream                Stream the final answer
   --show-analysis         Include judge analysis in md/text output
-  --log <path>            Write a JSON run record
+  --log <path>            Append a JSON run record (JSONL; one line per run)
   --max-cost <usd>        Warn/abort before run when the estimate exceeds this
   --version
   --help
@@ -63,7 +63,8 @@ export interface MainDeps {
   loadPrices?: (apiKey: string, baseUrl?: string) => Promise<Record<string, PriceEntry>>;
   stdout?: (s: string) => void;
   stderr?: (s: string) => void;
-  writeFile?: (path: string, data: string) => Promise<void>;
+  /** Append a line to the run log (§16 JSONL); defaults to fs.appendFile. */
+  appendFile?: (path: string, data: string) => Promise<void>;
   version?: string;
 }
 
@@ -89,7 +90,14 @@ async function defaultLoadPrices(apiKey: string, baseUrl?: string): Promise<Reco
   return table;
 }
 
-/** Returns true if the run should be aborted due to --max-cost. Best-effort (§8.2). */
+interface MaxCostOutcome {
+  /** Abort the run because the estimate exceeds the cap. */
+  abort: boolean;
+  /** The config loaded for the estimate, so the run can reuse it (avoids a second load; §8.2). */
+  config?: FusionixConfig;
+}
+
+/** Decide whether --max-cost should abort the run, and surface the config it loaded. Best-effort (§8.2). */
 async function checkMaxCost(
   maxCost: number,
   request: FusionixChatCompletionRequest,
@@ -99,9 +107,16 @@ async function checkMaxCost(
   env: Record<string, string | undefined>,
   deps: MainDeps,
   stderr: (s: string) => void,
-): Promise<boolean> {
+): Promise<MaxCostOutcome> {
+  let config: FusionixConfig;
   try {
-    const config = await (deps.loadConfig ?? defaultLoadConfig)();
+    config = await (deps.loadConfig ?? defaultLoadConfig)();
+  } catch (e) {
+    // Could not even load config — let the run load it and surface the real error.
+    stderr(`fusionix: --max-cost estimate unavailable (${errMessage(e)}). Proceeding.\n`);
+    return { abort: false };
+  }
+  try {
     const normOpts: { webOverride?: boolean } = {};
     if (webOverride !== undefined) normOpts.webOverride = webOverride;
     const plan = normalizeRequest(request, config, normOpts);
@@ -110,19 +125,20 @@ async function checkMaxCost(
     const { estimateUsd, missing } = estimateCost(plan, prices, { promptChars: prompt.length });
     if (missing.length > 0) {
       stderr(`fusionix: --max-cost: price unknown for ${missing.join(", ")}; cannot enforce pre-flight. Proceeding.\n`);
-      return false;
+      return { abort: false, config };
     }
     if (estimateUsd !== null && estimateUsd > maxCost) {
       stderr(`fusionix: estimated cost $${estimateUsd.toFixed(4)} exceeds --max-cost $${maxCost.toFixed(4)}. Aborting.\n`);
-      return true;
+      return { abort: true, config };
     }
     if (estimateUsd !== null) {
       stderr(`fusionix: estimated cost $${estimateUsd.toFixed(4)} (max $${maxCost.toFixed(4)}).\n`);
     }
-    return false;
+    return { abort: false, config };
   } catch (e) {
+    // Config loaded fine but estimation failed (e.g. price fetch). Reuse the config; skip the estimate.
     stderr(`fusionix: --max-cost estimate unavailable (${errMessage(e)}). Proceeding.\n`);
-    return false;
+    return { abort: false, config };
   }
 }
 
@@ -186,12 +202,16 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   const isTTY = deps.isTTY ?? Boolean(process.stdout.isTTY);
   const format: OutputFormat = args.format ?? (isTTY ? "md" : "json");
 
+  let preloadedConfig: FusionixConfig | undefined;
   if (args.maxCost !== undefined) {
-    const abort = await checkMaxCost(args.maxCost, request, webOverride, prompt, apiKey, env, deps, stderr);
+    const { abort, config } = await checkMaxCost(args.maxCost, request, webOverride, prompt, apiKey, env, deps, stderr);
     if (abort) return 1;
+    preloadedConfig = config;
   }
 
   const runOpts: RunFusionixOptions = { apiKey };
+  // Reuse the config already loaded for the estimate so the run doesn't re-read it (no double load / TOCTOU).
+  if (preloadedConfig) runOpts.config = preloadedConfig;
   if (webOverride !== undefined) runOpts.webOverride = webOverride;
   if (env.FUSIONIX_HTTP_REFERER) runOpts.referer = env.FUSIONIX_HTTP_REFERER;
   if (env.FUSIONIX_APP_TITLE) runOpts.title = env.FUSIONIX_APP_TITLE;
@@ -227,14 +247,20 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
 
   if (args.log) {
     try {
-      // Run record (§16): the OpenAI-shaped result plus a timestamp and the
-      // requested preset. (Fuller per-stage logging is a Phase-2 concern.)
+      // Run record (§16): timestamp, preset, resolved panel/judge/writer models, plus the
+      // OpenAI-shaped result (usage, cost, web, max_tool_calls_enforced, panel errors).
+      // Appended one JSON object per line so repeated runs accumulate as a JSONL run log.
       const record = {
         logged_at: new Date(result.created * 1000).toISOString(),
         preset: args.preset ?? null,
+        models: {
+          panel: result.panel ? result.panel.map((p) => p.model) : null,
+          judge: result.judge ?? null,
+          writer: result.model,
+        },
         ...toChatCompletion(result),
       };
-      await (deps.writeFile ?? writeFile)(args.log, JSON.stringify(record) + "\n");
+      await (deps.appendFile ?? appendFile)(args.log, JSON.stringify(record) + "\n");
     } catch (e) {
       stderr(`fusionix: could not write log to ${args.log}: ${errMessage(e)}\n`);
     }

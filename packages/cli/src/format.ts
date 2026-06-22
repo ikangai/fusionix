@@ -19,6 +19,18 @@ function nonEmpty<T>(arr: T[] | undefined): arr is T[] {
   return Array.isArray(arr) && arr.length > 0;
 }
 
+/** True if the judge analysis has any content worth rendering (avoids a dangling empty heading). */
+export function analysisHasContent(a: FusionixAnalysis): boolean {
+  return (
+    nonEmpty(a.consensus) ||
+    nonEmpty(a.contradictions) ||
+    nonEmpty(a.partialCoverage) ||
+    nonEmpty(a.uniqueInsights) ||
+    nonEmpty(a.blindSpots) ||
+    nonEmpty(a.ranking)
+  );
+}
+
 export function renderAnalysisMarkdown(a: FusionixAnalysis): string {
   const out: string[] = ["## Judge analysis"];
   if (nonEmpty(a.consensus)) out.push("**Consensus**\n" + a.consensus.map((c) => `- ${c}`).join("\n"));
@@ -43,7 +55,9 @@ export function renderAnalysisMarkdown(a: FusionixAnalysis): string {
 
 export function renderMarkdown(result: FusionixRunResult, opts: RenderOptions): string {
   const parts: string[] = [result.answer.trim()];
-  if (opts.showAnalysis && result.analysis) parts.push(renderAnalysisMarkdown(result.analysis));
+  if (opts.showAnalysis && result.analysis && analysisHasContent(result.analysis)) {
+    parts.push(renderAnalysisMarkdown(result.analysis));
+  }
   parts.push(`---\n\n_${footerLine(result)}_`);
   return parts.join("\n\n") + "\n";
 }
@@ -63,7 +77,9 @@ export function renderAnalysisText(a: FusionixAnalysis): string {
 
 export function renderText(result: FusionixRunResult, opts: RenderOptions): string {
   const parts: string[] = [result.answer.trim()];
-  if (opts.showAnalysis && result.analysis) parts.push(renderAnalysisText(result.analysis));
+  if (opts.showAnalysis && result.analysis && analysisHasContent(result.analysis)) {
+    parts.push(renderAnalysisText(result.analysis));
+  }
   parts.push(footerLine(result));
   return parts.join("\n\n") + "\n";
 }
@@ -71,7 +87,7 @@ export function renderText(result: FusionixRunResult, opts: RenderOptions): stri
 /** Render analysis (optional) + footer WITHOUT the answer, for the streaming path. */
 export function renderExtras(result: FusionixRunResult, opts: RenderOptions, format: "md" | "text"): string {
   const parts: string[] = [];
-  if (opts.showAnalysis && result.analysis) {
+  if (opts.showAnalysis && result.analysis && analysisHasContent(result.analysis)) {
     parts.push(format === "md" ? renderAnalysisMarkdown(result.analysis) : renderAnalysisText(result.analysis));
   }
   parts.push(format === "md" ? `---\n\n_${footerLine(result)}_` : footerLine(result));

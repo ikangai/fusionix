@@ -1,0 +1,16 @@
+{
+  "gateway": "https://openrouter.ai/api/v1",
+  "defaultPreset": "general-budget",
+  "presets": {
+    "general-budget": { "writer": "openai/gpt-5-mini" },
+    "legal-risk": {
+      "name": "legal-risk",
+      "description": "Cross-check legal-risk questions across a panel with conservative synthesis.",
+      "panel": ["anthropic/claude-opus-4.8", "openai/gpt-5.2", "google/gemini-3.1-pro-preview"],
+      "judge": "openai/gpt-5.2",
+      "writer": "anthropic/claude-opus-4.8",
+      "web": true,
+      "temperature": 0.2
+    }
+  }
+}

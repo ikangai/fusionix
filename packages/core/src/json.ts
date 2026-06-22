@@ -57,24 +57,31 @@ function balancedFrom(text: string, start: number, open: string, close: string):
   return undefined;
 }
 
-/** Find the first balanced JSON object/array candidate, choosing the earliest opener. */
-function firstCandidate(text: string): string | undefined {
-  const objIdx = text.indexOf("{");
-  const arrIdx = text.indexOf("[");
-  let start = -1;
-  let open = "{";
-  let close = "}";
-  if (objIdx >= 0 && (arrIdx < 0 || objIdx < arrIdx)) {
-    start = objIdx;
-    open = "{";
-    close = "}";
-  } else if (arrIdx >= 0) {
-    start = arrIdx;
-    open = "[";
-    close = "]";
+// Bound the candidate scan so pathological input (e.g. thousands of unbalanced
+// `{`) cannot make extraction super-linear. Realistic model output has only a
+// handful of brace spans before the JSON block, so this is never hit in practice.
+const MAX_JSON_CANDIDATES = 200;
+
+/**
+ * Scan `{`/`[` openers earliest-first and return the first balanced span that
+ * actually parses. Models routinely emit code, set notation, or placeholders
+ * (`f() { return x; }`, `{1,2,3}`, `{placeholder}`) BEFORE their JSON block, so a
+ * balanced-but-unparseable candidate must not abort the search — we advance to the
+ * next opener instead of giving up (spec §14.1/§14.2 lenient extraction).
+ */
+function scanForJson(text: string): unknown | undefined {
+  let tried = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch !== "{" && ch !== "[") continue;
+    if (++tried > MAX_JSON_CANDIDATES) break;
+    const candidate = balancedFrom(text, i, ch, ch === "{" ? "}" : "]");
+    if (candidate !== undefined) {
+      const parsed = tryParse(candidate);
+      if (parsed !== undefined) return parsed;
+    }
   }
-  if (start < 0) return undefined;
-  return balancedFrom(text, start, open, close);
+  return undefined;
 }
 
 export function extractJson(text: unknown): unknown | undefined {
@@ -93,12 +100,7 @@ export function extractJson(text: unknown): unknown | undefined {
     if (parsed !== undefined) return parsed;
   }
 
-  // 3. Scan for the first balanced object/array (handles JSON embedded in prose).
-  const candidate = firstCandidate(unfenced);
-  if (candidate !== undefined) {
-    const parsed = tryParse(candidate);
-    if (parsed !== undefined) return parsed;
-  }
-
-  return undefined;
+  // 3. Scan balanced object/array candidates earliest-first (handles JSON embedded
+  // in prose, including non-JSON brace spans that precede the real block).
+  return scanForJson(unfenced);
 }

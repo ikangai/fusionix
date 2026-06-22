@@ -127,14 +127,48 @@ test("a FusionixError from runFusionix → exit 1 with message and code", async 
 
 test("--log writes the run record", async () => {
   let written: { path: string; data: string } | undefined;
-  const h = harness({ writeFile: async (path: string, data: string) => void (written = { path, data }) });
+  const h = harness({ appendFile: async (path: string, data: string) => void (written = { path, data }) });
   const code = await main(["q", "--local", "--preset", "general-high", "--log", "run.jsonl"], h.deps);
   assert.equal(code, 0);
   assert.equal(written?.path, "run.jsonl");
+  // One trailing newline, exactly one JSON object on the line (JSONL, §16).
+  assert.ok(written!.data.endsWith("\n"));
   const record = JSON.parse(written!.data);
   assert.equal(record.object, "chat.completion");
   assert.equal(record.preset, "general-high");
   assert.ok(typeof record.logged_at === "string");
+});
+
+test("--log record includes resolved panel/judge/writer models (§16, C1)", async () => {
+  let written: { path: string; data: string } | undefined;
+  const h = harness({
+    appendFile: async (path: string, data: string) => void (written = { path, data }),
+    runFusionix: async () =>
+      sampleResult({
+        model: "writer/W",
+        judge: "judge/J",
+        panel: [
+          { model: "panel/P1", answer: "a" },
+          { model: "panel/P2", error: { message: "boom" } },
+        ],
+      }),
+  });
+  const code = await main(["q", "--local", "--log", "run.jsonl"], h.deps);
+  assert.equal(code, 0);
+  const rec = JSON.parse(written!.data);
+  assert.deepEqual(rec.models.panel, ["panel/P1", "panel/P2"]);
+  assert.equal(rec.models.judge, "judge/J");
+  assert.equal(rec.models.writer, "writer/W");
+});
+
+test("--max-cost passes the already-loaded config to runFusionix (no double load) (C4)", async () => {
+  const h = harness({
+    loadConfig: async () => smallConfig,
+    loadPrices: async () => ({ A: { prompt: 0.0000001, completion: 0.0000001 } }),
+  });
+  const code = await main(["q", "--local", "--max-cost", "100"], h.deps);
+  assert.equal(code, 0);
+  assert.equal(h.calls[0]!.opts.config, smallConfig, "config loaded for the estimate must be reused by the run");
 });
 
 test("--stream streams writer deltas to stdout", async () => {

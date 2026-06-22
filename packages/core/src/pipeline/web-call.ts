@@ -42,7 +42,11 @@ export async function chatWithWebFallback(
   try {
     const result = await gateway.chat(build(applyWeb(baseModel, true)), callOpts);
     return { result, usedWeb: true };
-  } catch {
+  } catch (err) {
+    // A deadline/caller abort is NOT a "web unsupported" signal: don't waste a second
+    // round-trip with the same dead signal, and don't let a timeout masquerade as a
+    // web fallback (§15/§17). Surface the abort as-is.
+    if (opts.signal?.aborted) throw err;
     // Web variant failed — retry once without it (a no-web failure is a real model failure).
     const result = await gateway.chat(build(baseModel), callOpts);
     return { result, usedWeb: false };

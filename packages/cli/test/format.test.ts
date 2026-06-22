@@ -83,3 +83,33 @@ test("cost null renders as n/a; bypass result shows single-model footer", () => 
   assert.match(md, /single model/);
   assert.doesNotMatch(md, /Judge analysis/); // no analysis in bypass even if requested
 });
+
+const EMPTY_ANALYSIS = {
+  consensus: [],
+  contradictions: [],
+  partialCoverage: [],
+  uniqueInsights: [],
+  blindSpots: [],
+  ranking: [],
+};
+
+test("renderMarkdown omits the analysis section when analysis is all-empty (BUG-3)", () => {
+  const md = renderMarkdown(result({ analysis: EMPTY_ANALYSIS }), { showAnalysis: true });
+  assert.doesNotMatch(md, /Judge analysis/); // no dangling empty heading
+  assert.match(md, /The answer is 42\./);
+});
+
+test("renderText omits the analysis line when analysis is all-empty (BUG-3)", () => {
+  const txt = renderText(result({ analysis: EMPTY_ANALYSIS }), { showAnalysis: true });
+  assert.doesNotMatch(txt, /Judge analysis/);
+});
+
+test("renderExtras omits empty analysis on the streaming path (BUG-3)", () => {
+  const md = renderExtras(result({ analysis: EMPTY_ANALYSIS }), { showAnalysis: true }, "md");
+  assert.doesNotMatch(md, /Judge analysis/);
+});
+
+test("non-empty analysis still renders under showAnalysis", () => {
+  const md = renderMarkdown(result(), { showAnalysis: true });
+  assert.match(md, /## Judge analysis/);
+});

@@ -166,6 +166,7 @@ export async function runFusionix(
       runId: plan.runId,
       answer,
       model: plan.writer,
+      judge: plan.judge,
       panel: responses,
       analysis,
       usage,

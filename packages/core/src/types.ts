@@ -195,6 +195,8 @@ export interface FusionixRunResult {
   answer: string;
   /** Writer model that produced the answer. */
   model: string;
+  /** Resolved judge model (deliberation runs only; omitted in single-model bypass). For run logging (§16). */
+  judge?: string;
   /** Omitted in single-model bypass mode (§6.7). */
   panel?: PanelResponse[];
   /** Omitted in single-model bypass mode (§6.7). */

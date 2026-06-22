@@ -54,6 +54,23 @@ test("web enabled and both attempts fail: error propagates (real model failure)"
   await assert.rejects(() => chatWithWebFallback(gateway, "m", msgs, { web: true }), /model down/);
 });
 
+test("web enabled, signal already aborted: rethrows abort with no no-web retry (BUG-2)", async () => {
+  // When the shared request deadline (or caller) has aborted, an aborted :online call
+  // must NOT be retried without web — that wastes a round-trip with a dead signal and
+  // conflates a timeout with 'web unsupported'. It should rethrow immediately (§15/§17).
+  const { gateway, calls } = gw(() => {
+    throw new DOMException("aborted", "AbortError");
+  });
+  const ac = new AbortController();
+  ac.abort();
+  await assert.rejects(
+    () => chatWithWebFallback(gateway, "m", msgs, { web: true, signal: ac.signal }),
+    (e: Error) => e.name === "AbortError",
+  );
+  assert.equal(calls.length, 1, "must not attempt the no-web fallback once the signal is aborted");
+  assert.equal(calls[0]!.req.model, "m:online");
+});
+
 test("passes temperature, maxTokens and signal", async () => {
   const { gateway, calls } = gw(() => ({ content: "x" }));
   const ac = new AbortController();
