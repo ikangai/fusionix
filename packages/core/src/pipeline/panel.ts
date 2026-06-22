@@ -9,8 +9,8 @@
 import { extractJson } from "../json.ts";
 import { prependSystem } from "../messages.ts";
 import { PANEL_SYSTEM, composeSystem } from "../prompts.ts";
-import { chatWithWebFallback } from "./web-call.ts";
-import type { WebCallOptions } from "./web-call.ts";
+import { chatWithWebFallback } from "../gateway/web-call.ts";
+import type { WebCallOptions } from "../gateway/web-call.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { Citation, ExecutionPlan, GatewayCallResult, PanelResponse } from "../types.ts";
 

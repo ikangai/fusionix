@@ -13,8 +13,8 @@ import { finalizeCost } from "../cost.ts";
 import { FusionixError } from "../errors.ts";
 import { applyWeb, webStatus } from "../gateway/web.ts";
 import { makeChatRequest, consumeStream } from "../gateway/contract.ts";
-import { chatWithWebFallback } from "./web-call.ts";
-import type { WebCallOptions } from "./web-call.ts";
+import { chatWithWebFallback } from "../gateway/web-call.ts";
+import type { WebCallOptions } from "../gateway/web-call.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { ExecutionPlan, FusionixRunResult, FusionixStage, GatewayCallResult } from "../types.ts";
 

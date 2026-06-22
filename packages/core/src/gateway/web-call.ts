@@ -7,9 +7,9 @@
  * run then reports `web: "unsupported"` (§15). A failure of the no-web retry is
  * a genuine model failure and propagates.
  */
-import { applyWeb } from "../gateway/web.ts";
-import { makeChatRequest } from "../gateway/contract.ts";
-import type { ChatGateway, ChatRequest } from "../gateway/contract.ts";
+import { applyWeb } from "./web.ts";
+import { makeChatRequest } from "./contract.ts";
+import type { ChatGateway, ChatRequest } from "./contract.ts";
 import type { GatewayCallResult } from "../types.ts";
 
 export interface WebCallOptions {

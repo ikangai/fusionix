@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chatWithWebFallback } from "../src/pipeline/web-call.ts";
+import { chatWithWebFallback } from "../src/gateway/web-call.ts";
 import type { ChatGateway, ChatRequest, ChatCallOptions } from "../src/gateway/contract.ts";
 import type { GatewayCallResult } from "../src/types.ts";
 
