@@ -51,7 +51,8 @@ function parseCitations(value: unknown): Citation[] | undefined {
   return out.length > 0 ? out : undefined;
 }
 
-function parsePanelContent(model: string, content: string): PanelResponse {
+/** Parse a panel/debate model's JSON answer (or keep raw text on parse failure; §14.1). Exported for the debate stage. */
+export function parsePanelContent(model: string, content: string): PanelResponse {
   const parsed = extractJson(content);
   if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;

@@ -18,6 +18,7 @@ import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
 import { runWriter } from "./writer.ts";
 import { runBypass } from "./bypass.ts";
+import { runDebate } from "./debate.ts";
 import { chooseWriter } from "./aggregator.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { GatewayClientOptions } from "../gateway/openrouter.ts";
@@ -26,6 +27,7 @@ import type {
   FusionixConfig,
   FusionixRunResult,
   FusionixStage,
+  GatewayCallResult,
 } from "../types.ts";
 
 const DEFAULT_MAX_REQUEST_DURATION_MS = 180_000;
@@ -118,12 +120,23 @@ export async function runFusionix(
 
     const prompt = renderCompactPrompt(plan.messages);
 
+    // Debate topology (§22.5): one inter-panel revision round before the judge. The
+    // revised answers replace the round-1 answers for the judge and the result.
+    let panelForJudge = responses;
+    let debateCalls: GatewayCallResult[] = [];
+    if (plan.topology === "debate") {
+      opts.onProgress?.("debate");
+      const debate = await runDebate(plan, prompt, responses, deps);
+      panelForJudge = debate.responses;
+      debateCalls = debate.calls;
+    }
+
     opts.onProgress?.("judge");
-    const { analysis, calls: judgeCalls } = await runJudge(plan, prompt, responses, deps);
+    const { analysis, calls: judgeCalls } = await runJudge(plan, prompt, panelForJudge, deps);
 
     // Adaptive aggregator (§22.2): optionally pick the writer from the surviving panel
     // models (judge ranking or capability prior). Defaults to plan.writer ("fixed").
-    const survivors = successes.map((r) => r.model);
+    const survivors = panelForJudge.filter((r) => r.error === undefined && r.answer !== undefined).map((r) => r.model);
     const chosenWriter = chooseWriter(plan, analysis, survivors, prompt);
     const writerPlan = chosenWriter === plan.writer ? plan : { ...plan, writer: chosenWriter };
 
@@ -131,14 +144,14 @@ export async function runFusionix(
     const writerDeps = opts.onWriterDelta ? { ...deps, onDelta: opts.onWriterDelta } : deps;
     const { answer, call: writerCall } = await runWriter(writerPlan, prompt, analysis, writerDeps);
 
-    const allCalls = [...panelCalls, ...judgeCalls, writerCall];
+    const allCalls = [...panelCalls, ...debateCalls, ...judgeCalls, writerCall];
     const { usage, costUsd } = await finalizeCost(deps.gateway, allCalls);
     const result: FusionixRunResult = {
       runId: plan.runId,
       answer,
       model: writerPlan.writer,
       judge: plan.judge,
-      panel: responses,
+      panel: panelForJudge,
       analysis,
       usage,
       costUsd,

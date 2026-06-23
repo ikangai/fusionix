@@ -46,6 +46,7 @@ interface Scenario {
     onlineFails?: boolean; // ":online" variant throws → fallback to base (web unsupported)
     usage?: { p: number; c: number; cost?: number };
   };
+  debate?: { answerPrefix?: string; default?: Behavior; models?: Record<string, Behavior> }; // §22.5 revision round
   judge?: { first?: Behavior; repair?: Behavior; usage?: { p: number; c: number; cost?: number } };
   writer?: Behavior & { stream?: boolean };
   prices?: Record<string, PriceEntry> | null; // null → loadPrices throws (unavailable)
@@ -60,6 +61,7 @@ function loadScenario(): Scenario {
 }
 
 const PANEL_MARK = "You are one expert in a panel";
+const DEBATE_MARK = "You are revising your earlier answer";
 const JUDGE_MARK = "You compare several model answers";
 const WRITER_MARK = "Write the final answer";
 const REPAIR_MARK = "You convert text into a single JSON object";
@@ -68,10 +70,11 @@ function systemText(req: ChatRequest): string {
   const sys = req.messages.find((m) => m.role === "system");
   return typeof sys?.content === "string" ? sys.content : "";
 }
-type Stage = "panel" | "judge" | "repair" | "writer" | "single";
+type Stage = "panel" | "debate" | "judge" | "repair" | "writer" | "single";
 function detectStage(req: ChatRequest): Stage {
   const s = systemText(req);
   if (s.startsWith(PANEL_MARK)) return "panel";
+  if (s.startsWith(DEBATE_MARK)) return "debate";
   if (s.startsWith(REPAIR_MARK)) return "repair";
   if (s.startsWith(JUDGE_MARK)) return "judge";
   if (s.startsWith(WRITER_MARK)) return "writer";
@@ -124,6 +127,19 @@ function makeFakeGateway(sc: Scenario): ChatGateway {
       if (b.mode === "throw") throw new Error(b.message ?? `panel ${baseModel} failed`);
       const r: GatewayCallResult = { content: panelContent(baseModel, b), usage: usageOf(b.usage ?? panelUsage), id: `gen-${baseModel}` };
       return r;
+    }
+    if (stage === "debate") {
+      // §22.5 revision round: behaves like the panel but with a distinct answer prefix
+      // so a revised answer is visibly different from the round-1 answer.
+      const b = sc.debate?.models?.[baseModel] ?? sc.debate?.default ?? { mode: "json" };
+      if (b.mode === "throw") throw new Error(b.message ?? `debate ${baseModel} failed`);
+      const prefix = sc.debate?.answerPrefix ?? "revised";
+      let content: string;
+      if (b.mode === "json") content = JSON.stringify({ answer: `${prefix}-${baseModel}`, assumptions: [], risks: [], citations: [] });
+      else if (b.mode === "text") content = `Revised prose from ${baseModel}.`;
+      else if (b.mode === "empty") content = "";
+      else content = b.content ?? "";
+      return { content, usage: usageOf(panelUsage), id: `gen-debate-${baseModel}` };
     }
     if (stage === "judge" || stage === "repair") {
       const b = (stage === "repair" ? sc.judge?.repair : sc.judge?.first) ?? { mode: "json" };

@@ -20,6 +20,11 @@ Each answer is labelled "[n] <model-id>". In "ranking", list the <model-id> valu
 Return JSON:
 { "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }`;
 
+export const DEBATE_SYSTEM = `You are revising your earlier answer after seeing other experts' independent answers to the same question.
+Keep what is correct, adopt stronger points, and fix mistakes — but do not defer blindly; change your answer only where the others are more correct.
+Return JSON:
+{ "answer": "...", "assumptions": [], "risks": [], "citations": [] }`;
+
 export const WRITER_SYSTEM = `Write the final answer to the user's question using the judge analysis.
 Rules:
 - Lead with the answer.
