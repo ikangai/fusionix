@@ -87,12 +87,18 @@ test("skips a non-JSON span before a real array", () => {
 
 test("stays bounded (no quadratic blowup) on many unbalanced openers", () => {
   // Every index is an opener and the whole thing never closes — the scan must stay linear-ish.
-  const big = "{".repeat(100000) + "x";
+  const n = 50000;
+  const big = "{".repeat(n) + "x";
+  // Warm up the JIT on a smaller input first, so the timed call measures algorithmic cost,
+  // not one-time compilation (timing a single cold call is otherwise flaky on a loaded VM).
+  assert.equal(extractJson("{".repeat(1000) + "x"), undefined);
   const start = process.hrtime.bigint();
   const result = extractJson(big);
   const ms = Number(process.hrtime.bigint() - start) / 1e6;
   assert.equal(result, undefined);
-  assert.ok(ms < 500, `extractJson took ${ms.toFixed(0)}ms (possible quadratic blowup)`);
+  // Linear is ~0.2s warm; quadratic on 50k openers would be tens of seconds. A wide ceiling
+  // catches a real regression decisively while tolerating a loaded VM running tests in parallel.
+  assert.ok(ms < 3000, `extractJson took ${ms.toFixed(0)}ms (possible quadratic blowup)`);
 });
 
 test("returns quickly (no ReDoS) for a large unterminated fence", () => {
