@@ -54,13 +54,17 @@ bytes are pinned by the unit tests instead.
 
 ### Design choices worth recording
 
-- **Judge ranking had to be pinned to model-ids — but only for `top-ranked`.** The judge's
-  `ranking` was free-form text and answers were labelled with *both* an index and a model-id,
-  so `ranking[0]` could not be mapped to a model. `top-ranked` therefore appends a
-  `JUDGE_RANKING_INSTRUCTION` (rank by model-id) **only when that strategy is active**, so the
-  default judge prompt stays byte-for-byte §14.2; plus `resolveRankedModel` (slug / `[n]`
-  index / family substring → surviving model). A bare numeric token is treated strictly as an
-  index, never a substring, so `"4"` does not spuriously match the `4` in `claude-opus-4.8`.
+- **Judge ranking had to be pinned to model-ids — for every feature that reads it.** The
+  judge's `ranking` was free-form text and answers were labelled with *both* an index and a
+  model-id, so `ranking[0]` could not be mapped to a model. `JUDGE_RANKING_INSTRUCTION` (rank
+  by model-id) is therefore appended whenever the run resolves the ranking back to a model —
+  the `top-ranked` writer strategy (§22.2), the verifier accept-gate (§23.1), *and*
+  writer-access `judge+top` (§23.3). (The holistic review caught that v0.10 added the latter
+  two consumers without revisiting the v0.9 gate, so a standalone accept-gate silently
+  fell back to the first survivor.) The default path sets none of these, so the judge prompt
+  stays byte-for-byte §14.2; resolution is `resolveRankedIndex` (slug / `[n]` index / family
+  substring → position). A bare numeric token is treated strictly as an index, never a
+  substring, so `"4"` does not spuriously match the `4` in `claude-opus-4.8`.
 - **Routing reuses the bypass path** rather than adding a parallel execution path: it sets
   `bypass = true` and `writer = <routed model>` in normalization. It only applies to the
   `fusionix` meta-model so an explicitly named model is never silently swapped (code review

@@ -289,7 +289,7 @@ The Fusionix SDK reads this event. Raw OpenAI SDK users should **not** rely on r
 
 ```text
 event: fusionix.progress
-data: { "stage": "panel" | "judge" | "writer" }
+data: { "stage": "panel" | "debate" | "chain" | "judge" | "writer" }
 ```
 
 Panel and judge complete before any answer token streams, so expect a quiet front-end window; progress events (or a caller-side spinner) cover it. Three sequential stages over large models commonly take 30–90s; set this expectation on the landing page.
@@ -362,7 +362,7 @@ Core resolves a single execution plan before any model call, so behavior is dete
    - no user message can be found
    - more than one Fusionix plugin is present
    - `analysis_models` is present but empty
-   - the resolved panel is empty, or the resolved judge or writer is missing
+   - the resolved panel is empty, or the resolved judge (except in chain topology, §23.4, which has no judge stage) or writer is missing
    - `max_tool_calls` is provided but is not a positive integer
    - `stream` is provided but is not a boolean
 
@@ -663,6 +663,7 @@ OPENROUTER_API_KEY=...           # local mode / gateway calls
 FUSIONIX_API_KEY=...               # hosted client auth (CLI/SDK)
 FUSIONIX_ENCRYPTION_KEY=...        # AEAD key for stored gateway secrets (api package)
 FUSIONIX_GATEWAY_SECRET=...        # used only by fusionix-admin set-gateway-key (alternative to stdin)
+FUSIONIX_CONFIG=...                # explicit external config file path (overrides <cwd>/fusionix.config.json)
 FUSIONIX_DEFAULT_PRESET=general-high
 FUSIONIX_DEFAULT_GATEWAY=https://openrouter.ai/api/v1
 FUSIONIX_HTTP_REFERER=...          # optional OpenRouter attribution (§13.4)
@@ -895,7 +896,7 @@ It always falls back to the configured writer when nothing resolves. `result.mod
 
 ### 22.4 Single-model routing
 
-`plugins[0].route` (CLI `--route`, or `--mode fast`): fusionix picks the single best-fit model from the pool via the capability prior (§22.6) and a deterministic keyword category detection over the **user turn**, then runs it through the single-model bypass path (§6.7). Routing applies only to the `fusionix` meta-model: an explicit concrete `model` or `enabled:false` bypass wins, so a named model is never silently swapped. Routed runs surface `route_category` + `model_used` in the JSON extras and the CLI footer. This is **not** a passthrough proxy (§6.8's `not_a_fusionix_request` rule is unchanged). (Fugu's latency-aware variant: route each query to the most capable single model.)
+`plugins[0].route` (CLI `--route`, or `--mode fast`): fusionix picks the single best-fit model from the pool via the capability prior (§22.6) and a deterministic keyword category detection over the **user turn**, then runs it through the single-model bypass path (§6.7). Routing applies only to the `fusionix` meta-model: an explicit concrete `model` or `enabled:false` bypass wins, so a named model is never silently swapped. Routed runs surface `route_category` + `model_used` in the JSON extras and the CLI footer. This is **not** a passthrough proxy (§6.8's `not_a_fusionix_request` rule is unchanged). A single-model run (route, `--mode fast`, or `enabled:false`) is **mutually exclusive with a panel topology** (§22.5/§23.4): combining them is rejected with `400 invalid_request` rather than silently dropping the topology. (Fugu's latency-aware variant: route each query to the most capable single model.)
 
 ### 22.5 Debate topology
 
@@ -932,7 +933,7 @@ The §22.6 capability prior (`capabilities.ts`) is reconciled with TRINITY's *me
 
 ### 23.4 Chain topology
 
-`plugins[0].topology: "chain"` (CLI `--topology chain`): a sequential **planner → builder(s) → finalizer** pipeline. The panel models run in order, each seeing the accumulated work of the prior steps; the last step that produces content is the final answer. This is the asymmetric staged hand-off Conductor's data (§F.1, Fig. 8) shows wins on hard multi-step tasks — distinct from the parallel panel and the symmetric §22.5 debate round. There is **no judge or writer stage** in chain mode (so chain needs no judge model); chain steps may use web like the panel, and a failed/empty step is kept in place while the chain continues.
+`plugins[0].topology: "chain"` (CLI `--topology chain`): a sequential **planner → builder(s) → finalizer** pipeline. The panel models run in order, each seeing the accumulated work of the prior steps; the last step that produces content is the final answer. This is the asymmetric staged hand-off Conductor's data (§F.1, Fig. 8) shows wins on hard multi-step tasks — distinct from the parallel panel and the symmetric §22.5 debate round. There is **no judge or writer stage** in chain mode (so chain needs no judge model); chain steps may use web like the panel, and a failed/empty step is kept in place while the chain continues. Because chain has neither a judge nor a writer stage, the writer/judge-stage controls (`writer_strategy` §22.2, `writer_access` §23.3, `accept_on_consensus` §23.1) cannot apply: requesting any of them with `topology=chain` is rejected with `400 invalid_request` rather than silently ignored.
 
 ### 23.5 Deferred / not applicable (TRINITY / Conductor)
 
