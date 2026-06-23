@@ -135,6 +135,24 @@ test("unknown topology → invalid_request", () => {
   );
 });
 
+test("chain topology does not require a judge model (§23.4)", () => {
+  const noJudge: FusionixConfig = {
+    ...config,
+    presets: { gh: { ...config.presets.gh!, judge: "" } },
+  };
+  // A non-chain run with no judge would throw; chain must not.
+  const plan = normalizeRequest(
+    req({ model: "fusionix", messages: [msg("q")], plugins: [{ id: "fusionix", topology: "chain" }] }),
+    noJudge,
+    RID,
+  );
+  assert.equal(plan.topology, "chain");
+  expectCode(
+    () => normalizeRequest(req({ model: "fusionix", messages: [msg("q")] }), noJudge, RID),
+    "invalid_request",
+  );
+});
+
 // ---- routing (§22.4) -----------------------------------------------------
 
 test("route picks the best-fit single model for the detected category and bypasses", () => {

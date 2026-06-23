@@ -25,6 +25,11 @@ Return JSON:
  */
 export const JUDGE_RANKING_INSTRUCTION = `Each answer is labelled "[n] <model-id>". In "ranking", list the <model-id> values (the identifier after the bracketed number, e.g. "openai/gpt-5.2"), best answer first.`;
 
+export const CHAIN_SYSTEM = `You are one expert in a sequential chain solving the user's question step by step.
+Do your assigned step well, and build on the work so far when it is provided.
+Return JSON:
+{ "answer": "...", "assumptions": [], "risks": [], "citations": [] }`;
+
 export const DEBATE_SYSTEM = `You are revising your earlier answer after seeing other experts' independent answers to the same question.
 Keep what is correct, adopt stronger points, and fix mistakes — but do not defer blindly; change your answer only where the others are more correct.
 Return JSON:

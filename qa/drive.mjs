@@ -249,6 +249,22 @@ test({ id: "N8", desc: "§22 default (no v0.9 flags) is unchanged deliberation",
     // round-1 ("ans-") answers, not a debate round ("revised-"): catches topology defaulting on.
     && j.fusionix.panel.every((p)=>p.answer.startsWith("ans-")); } });
 
+// ----- O. v0.10 coordination extensions (§23) -----
+test({ id: "O1", desc: "§23.1 --accept-on-consensus skips the writer on judge consensus", bin: "harness", scenario: { judge: { consensus: true } }, args: ["q", "--local", "--accept-on-consensus", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===true && j.fusionix.panel.some((p)=>p.answer===j.choices[0].message.content); } });
+test({ id: "O2", desc: "§23.1 accept-gate does NOT fire when the judge reports disagreement", bin: "harness", args: ["q", "--local", "--accept-on-consensus", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===undefined && inc(j.choices[0].message.content, "FINAL ANSWER"); } });
+test({ id: "O3", desc: "§23.3 --writer-access judge+panel runs and produces an answer", bin: "harness", args: ["q", "--local", "--writer-access", "judge+panel", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.choices[0].message.content.length>0 && j.fusionix.panel.length===3; } });
+test({ id: "O4", desc: "§23.4 --topology chain runs sequential steps, no judge analysis", bin: "harness", args: ["q", "--local", "--topology", "chain", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.analysis===undefined && j.fusionix.panel.length===3 && j.fusionix.panel.every((p)=>p.answer.startsWith("chain-")); } });
+test({ id: "O5", desc: "§23.4 --topology chain needs no judge model (panel-only)", bin: "harness", args: ["q", "--local", "--panel", "openai/gpt-5.2,anthropic/claude-opus-4.8", "--topology", "chain", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===2; } });
+test({ id: "EC-O6a", desc: "§23.3 invalid --writer-access -> exit 2", bin: "cli", args: ["q", "--local", "--writer-access", "everything"],
+  check: (r) => r.status === 2 && inc(r.stderr, "writer-access") });
+test({ id: "O7", desc: "§23 default (no v0.10 flags) is unchanged: writer runs, no accept/chain markers", bin: "harness", args: ["q", "--local", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===undefined && j.fusionix.analysis!==undefined && inc(j.choices[0].message.content, "FINAL ANSWER"); } });
+
 // ---------------------------------------------------------------------------
 // Execute
 // ---------------------------------------------------------------------------

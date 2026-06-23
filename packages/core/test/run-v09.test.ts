@@ -22,9 +22,10 @@ function config(): FusionixConfig {
 }
 
 // Detect stage by the system prompt so judge and writer may share a model slug.
-function stageOf(req: ChatRequest): "panel" | "debate" | "judge" | "writer" | "single" {
+function stageOf(req: ChatRequest): "panel" | "chain" | "debate" | "judge" | "writer" | "single" {
   const sys = req.messages.find((m) => m.role === "system");
   const s = typeof sys?.content === "string" ? sys.content : "";
+  if (s.startsWith("You are one expert in a sequential chain")) return "chain";
   if (s.startsWith("You are one expert in a panel")) return "panel";
   if (s.startsWith("You are revising your earlier answer")) return "debate";
   if (s.startsWith("You compare several model answers")) return "judge";
@@ -43,6 +44,7 @@ function gatewayWith(ranking: string[]) {
       const u: GatewayCallResult["usage"] = { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.1 };
       const stage = stageOf(req);
       if (stage === "panel") return { content: JSON.stringify({ answer: `ans-${req.model}` }), usage: u };
+      if (stage === "chain") return { content: JSON.stringify({ answer: `chain-${req.model}` }), usage: u };
       if (stage === "debate") return { content: JSON.stringify({ answer: `rev-${req.model}` }), usage: u };
       if (stage === "judge") return { content: analysis, usage: u };
       return { content: "FINAL", usage: u }; // writer / single
@@ -181,6 +183,22 @@ test("accept-on-consensus skips the writer and returns the top panelist (§23.1)
   assert.ok(r.analysis, "analysis is still present");
   assert.equal(calls.filter((c) => stageOf(c) === "writer").length, 0, "no writer call");
   assert.deepEqual(stages, ["panel", "judge"], "writer stage never announced");
+});
+
+test("topology 'chain' runs sequential steps, no judge, last step is the answer (§23.4)", async () => {
+  const stages: string[] = [];
+  const { gateway, calls } = gatewayWith([]);
+  const r = await runFusionix(fx({ topology: "chain" }), {
+    config: config(),
+    gateway,
+    apiKey: "x",
+    onProgress: (s) => stages.push(s),
+  });
+  assert.equal(r.answer, `chain-${GEMINI}`, "final answer is the last chain step");
+  assert.equal(r.analysis, undefined, "no judge analysis in chain mode");
+  assert.deepEqual(r.panel?.map((p) => p.answer), [`chain-${OPUS}`, `chain-${GPT}`, `chain-${GEMINI}`]);
+  assert.deepEqual(stages, ["chain", "chain", "chain"]);
+  assert.equal(calls.filter((c) => stageOf(c) === "judge").length, 0, "no judge call");
 });
 
 test("accept-on-consensus does NOT skip the writer when the judge reports a contradiction (§23.1)", async () => {

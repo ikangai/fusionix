@@ -160,7 +160,8 @@ export function normalizeRequest(
           : "Resolved panel is empty.",
       );
     }
-    if (!judge) throw new FusionixError("invalid_request", "No judge model resolved.");
+    // The chain topology (§23.4) has no judge stage, so it needs no judge model.
+    if (topology !== "chain" && !judge) throw new FusionixError("invalid_request", "No judge model resolved.");
   }
 
   const plan: ExecutionPlan = {

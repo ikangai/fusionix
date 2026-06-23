@@ -19,6 +19,7 @@ import { runJudge } from "./judge.ts";
 import { runWriter } from "./writer.ts";
 import { runBypass } from "./bypass.ts";
 import { runDebate } from "./debate.ts";
+import { runChain } from "./chain.ts";
 import { chooseWriter, acceptTopOnConsensus, writerPanelContext } from "./aggregator.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { GatewayClientOptions } from "../gateway/openrouter.ts";
@@ -104,6 +105,10 @@ export async function runFusionix(
   try {
     if (plan.bypass) {
       return await runBypass(plan, deps, opts, startedAt, now);
+    }
+    if (plan.topology === "chain") {
+      // Sequential planner → builder → finalizer; no panel/judge/writer (§23.4).
+      return await runChain(plan, deps, opts, startedAt, now);
     }
 
     opts.onProgress?.("panel");

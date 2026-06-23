@@ -47,6 +47,7 @@ interface Scenario {
     usage?: { p: number; c: number; cost?: number };
   };
   debate?: { answerPrefix?: string; default?: Behavior; models?: Record<string, Behavior> }; // §22.5 revision round
+  chain?: { answerPrefix?: string; default?: Behavior; models?: Record<string, Behavior> }; // §23.4 sequential chain
   judge?: { first?: Behavior; repair?: Behavior; ranking?: string[]; consensus?: boolean; usage?: { p: number; c: number; cost?: number } }; // consensus → empty contradictions/blind_spots (§23.1)
   writer?: Behavior & { stream?: boolean };
   prices?: Record<string, PriceEntry> | null; // null → loadPrices throws (unavailable)
@@ -61,6 +62,7 @@ function loadScenario(): Scenario {
 }
 
 const PANEL_MARK = "You are one expert in a panel";
+const CHAIN_MARK = "You are one expert in a sequential chain";
 const DEBATE_MARK = "You are revising your earlier answer";
 const JUDGE_MARK = "You compare several model answers";
 const WRITER_MARK = "Write the final answer";
@@ -70,9 +72,10 @@ function systemText(req: ChatRequest): string {
   const sys = req.messages.find((m) => m.role === "system");
   return typeof sys?.content === "string" ? sys.content : "";
 }
-type Stage = "panel" | "debate" | "judge" | "repair" | "writer" | "single";
+type Stage = "panel" | "chain" | "debate" | "judge" | "repair" | "writer" | "single";
 function detectStage(req: ChatRequest): Stage {
   const s = systemText(req);
+  if (s.startsWith(CHAIN_MARK)) return "chain";
   if (s.startsWith(PANEL_MARK)) return "panel";
   if (s.startsWith(DEBATE_MARK)) return "debate";
   if (s.startsWith(REPAIR_MARK)) return "repair";
@@ -127,6 +130,18 @@ function makeFakeGateway(sc: Scenario): ChatGateway {
       if (b.mode === "throw") throw new Error(b.message ?? `panel ${baseModel} failed`);
       const r: GatewayCallResult = { content: panelContent(baseModel, b), usage: usageOf(b.usage ?? panelUsage), id: `gen-${baseModel}` };
       return r;
+    }
+    if (stage === "chain") {
+      // §23.4 sequential chain: panel-like step output with a distinct prefix per model.
+      const b = sc.chain?.models?.[baseModel] ?? sc.chain?.default ?? { mode: "json" };
+      if (b.mode === "throw") throw new Error(b.message ?? `chain ${baseModel} failed`);
+      const prefix = sc.chain?.answerPrefix ?? "chain";
+      let content: string;
+      if (b.mode === "json") content = JSON.stringify({ answer: `${prefix}-${baseModel}`, assumptions: [], risks: [], citations: [] });
+      else if (b.mode === "text") content = `Chain step from ${baseModel}.`;
+      else if (b.mode === "empty") content = "";
+      else content = b.content ?? "";
+      return { content, usage: usageOf(panelUsage), id: `gen-chain-${baseModel}` };
     }
     if (stage === "debate") {
       // §22.5 revision round: behaves like the panel but with a distinct answer prefix
