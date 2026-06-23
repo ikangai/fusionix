@@ -135,6 +135,31 @@ test("unknown topology → invalid_request", () => {
   );
 });
 
+test("route + a non-standard topology → invalid_request (no silent discard)", () => {
+  expectCode(
+    () => normalizeRequest(req({ model: "fusionix", messages: [msg("q")], plugins: [{ id: "fusionix", route: true, topology: "chain" }] }), config, RID),
+    "invalid_request",
+  );
+  expectCode(
+    () => normalizeRequest(req({ model: "fusionix", messages: [msg("q")], plugins: [{ id: "fusionix", route: true, topology: "debate" }] }), config, RID),
+    "invalid_request",
+  );
+});
+
+test("chain topology + a writer/judge-stage flag → invalid_request (chain has neither stage)", () => {
+  const combos: Record<string, unknown>[] = [
+    { topology: "chain", writer_strategy: "top-ranked" },
+    { topology: "chain", writer_access: "judge+panel" },
+    { topology: "chain", accept_on_consensus: true },
+  ];
+  for (const c of combos) {
+    expectCode(
+      () => normalizeRequest(req({ model: "fusionix", messages: [msg("q")], plugins: [{ id: "fusionix", ...c }] }), config, RID),
+      "invalid_request",
+    );
+  }
+});
+
 test("chain topology does not require a judge model (§23.4)", () => {
   const noJudge: FusionixConfig = {
     ...config,

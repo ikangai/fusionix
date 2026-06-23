@@ -147,6 +147,27 @@ export function normalizeRequest(
     }
   }
 
+  // v0.10 cross-feature validation: reject flag combinations where one feature would
+  // silently annihilate another (single-model path vs a panel topology; chain vs the
+  // writer/judge-stage controls it has no stage for), instead of ignoring the conflict.
+  if (bypass && topology !== undefined && topology !== "standard") {
+    throw new FusionixError(
+      "invalid_request",
+      "A single-model run (route / --mode fast / enabled:false) cannot be combined with a panel topology.",
+    );
+  }
+  if (topology === "chain") {
+    if (writerStrategy !== undefined && writerStrategy !== "fixed") {
+      throw new FusionixError("invalid_request", "writer_strategy has no effect with topology=chain (no writer stage).");
+    }
+    if (writerAccess !== undefined && writerAccess !== "judge") {
+      throw new FusionixError("invalid_request", "writer_access has no effect with topology=chain (no writer stage).");
+    }
+    if (acceptOnConsensus) {
+      throw new FusionixError("invalid_request", "accept_on_consensus has no effect with topology=chain (no judge stage).");
+    }
+  }
+
   // Model presence (§6.8 step 6). Writer always; panel/judge only when deliberating.
   if (!writer) {
     throw new FusionixError("invalid_request", "No writer model resolved.");

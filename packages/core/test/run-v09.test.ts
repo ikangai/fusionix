@@ -89,14 +89,19 @@ test("writer-access default ('judge') shows the writer only the analysis, not th
   assert.doesNotMatch(writerUserOf(calls), /Panel answers:/);
 });
 
-test("top-ranked adds the model-id ranking instruction to the judge prompt; default does not (§22.2)", async () => {
-  const a = gatewayWith([GEMINI]);
-  await runFusionix(fx({ writer_strategy: "top-ranked" }), { config: config(), gateway: a.gateway, apiKey: "x" });
-  assert.match(judgeSystemOf(a.calls), /model-id/, "top-ranked judge prompt is augmented");
+test("the model-id ranking instruction is added for EVERY ranking consumer; default omits it (§22.2/§23.1/§23.3)", async () => {
+  // Default deliberation: pristine §14.2 judge prompt.
+  const def = gatewayWith([GEMINI]);
+  await runFusionix(fx({}), { config: config(), gateway: def.gateway, apiKey: "x" });
+  assert.doesNotMatch(judgeSystemOf(def.calls), /model-id/, "default judge prompt is pristine §14.2");
 
-  const b = gatewayWith([GEMINI]);
-  await runFusionix(fx({}), { config: config(), gateway: b.gateway, apiKey: "x" });
-  assert.doesNotMatch(judgeSystemOf(b.calls), /model-id/, "default judge prompt is the pristine §14.2 text");
+  // All three features that resolve the ranking to a model must augment the judge prompt,
+  // or their pick silently degrades to the first survivor.
+  for (const plugin of [{ writer_strategy: "top-ranked" }, { accept_on_consensus: true }, { writer_access: "judge+top" }]) {
+    const g = gatewayWith([GEMINI]);
+    await runFusionix(fx(plugin), { config: config(), gateway: g.gateway, apiKey: "x" });
+    assert.match(judgeSystemOf(g.calls), /model-id/, `${JSON.stringify(plugin)} must add the ranking instruction`);
+  }
 });
 
 test("writer-strategy 'fixed' (default) uses the configured writer despite the ranking", async () => {

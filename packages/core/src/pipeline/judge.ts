@@ -106,10 +106,14 @@ export async function runJudge(
   // Initial judge call. (Judge never uses web.)
   let firstContent: string;
   try {
-    // The model-id ranking instruction is added only for the top-ranked writer strategy
-    // (§22.2); otherwise the judge prompt is exactly §14.2.
-    const judgeBase =
-      plan.writerStrategy === "top-ranked" ? `${JUDGE_SYSTEM}\n\n${JUDGE_RANKING_INSTRUCTION}` : JUDGE_SYSTEM;
+    // The model-id ranking instruction is added for EVERY feature that maps the judge's
+    // ranking back to a panel model — the top-ranked writer strategy (§22.2), the verifier
+    // accept-gate (§23.1), and writer-access judge+top (§23.3) — otherwise their pick
+    // silently degrades to the first survivor. The default path sets none of these, so the
+    // judge prompt stays exactly §14.2.
+    const needsModelIdRanking =
+      plan.writerStrategy === "top-ranked" || plan.acceptOnConsensus === true || plan.writerAccess === "judge+top";
+    const judgeBase = needsModelIdRanking ? `${JUDGE_SYSTEM}\n\n${JUDGE_RANKING_INSTRUCTION}` : JUDGE_SYSTEM;
     const systemText = composeSystem(judgeBase, plan.judgeSystem);
     const user = renderJudgeUser(prompt, renderAnswers(panel));
     const res = await deps.gateway.chat(

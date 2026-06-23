@@ -250,8 +250,8 @@ test({ id: "N8", desc: "§22 default (no v0.9 flags) is unchanged deliberation",
     && j.fusionix.panel.every((p)=>p.answer.startsWith("ans-")); } });
 
 // ----- O. v0.10 coordination extensions (§23) -----
-test({ id: "O1", desc: "§23.1 --accept-on-consensus skips the writer on judge consensus", bin: "harness", scenario: { judge: { consensus: true } }, args: ["q", "--local", "--accept-on-consensus", "--format", "json"],
-  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===true && j.fusionix.panel.some((p)=>p.answer===j.choices[0].message.content); } });
+test({ id: "O1", desc: "§23.1 --accept-on-consensus skips the writer and returns the judge's #1 RANKED panelist (gemini), not the first (opus)", bin: "harness", scenario: { judge: { consensus: true, ranking: ["google/gemini-3.1-pro-preview", "anthropic/claude-opus-4.8", "openai/gpt-5.2"] } }, args: ["q", "--local", "--accept-on-consensus", "--format", "json"],
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===true && j.choices[0].message.content==="ans-google/gemini-3.1-pro-preview"; } });
 test({ id: "O2", desc: "§23.1 accept-gate does NOT fire when the judge reports disagreement", bin: "harness", args: ["q", "--local", "--accept-on-consensus", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.accepted_on_consensus===undefined && inc(j.choices[0].message.content, "FINAL ANSWER"); } });
 test({ id: "O3", desc: "§23.3 --writer-access judge+panel runs and returns an answer (panel→writer plumbing is unit-tested)", bin: "harness", args: ["q", "--local", "--writer-access", "judge+panel", "--format", "json"],
