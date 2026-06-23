@@ -101,7 +101,9 @@ export async function runChain(
   }
 
   const { usage, costUsd } = await finalizeCost(deps.gateway, calls);
-  return {
+  // The answering call is the last one (the finalizer step that produced content).
+  const finishReason = calls[calls.length - 1]?.finishReason;
+  const result: FusionixRunResult = {
     runId: plan.runId,
     answer: finalStep.answer,
     model: finalStep.model,
@@ -113,4 +115,6 @@ export async function runChain(
     maxToolCallsEnforced: false,
     created: Math.floor(startedAt / 1000),
   };
+  if (finishReason) result.finishReason = finishReason;
+  return result;
 }

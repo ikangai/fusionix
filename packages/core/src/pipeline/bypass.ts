@@ -80,5 +80,6 @@ export async function runBypass(
   // Routing (§22.4) reuses bypass mechanics; surface the detected category so the
   // run reports which model was auto-selected and why.
   if (plan.routeCategory !== undefined) result.routeCategory = plan.routeCategory;
+  if (call.finishReason) result.finishReason = call.finishReason;
   return result;
 }

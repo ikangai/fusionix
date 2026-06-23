@@ -167,6 +167,8 @@ export interface GatewayCallResult {
   id?: string;
   /** Model echoed by the gateway. */
   model?: string;
+  /** Upstream finish_reason (e.g. "stop", "length"); used to report truncation faithfully. */
+  finishReason?: string;
   raw?: unknown;
 }
 
@@ -247,4 +249,8 @@ export interface FusionixRunResult {
   routeCategory?: string;
   /** True when the writer was skipped because the judge reported consensus (v0.10 §23.1). */
   acceptedOnConsensus?: boolean;
+  /** True when `model` was selected (adaptive writer / accept-gate), not the configured writer — surfaces model_used in the wire. */
+  modelSelected?: boolean;
+  /** Upstream finish_reason of the answering call ("stop" | "length" | …); defaults to "stop" when unknown. */
+  finishReason?: string;
 }

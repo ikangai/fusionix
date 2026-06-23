@@ -113,3 +113,12 @@ test("non-empty analysis still renders under showAnalysis", () => {
   const md = renderMarkdown(result(), { showAnalysis: true });
   assert.match(md, /## Judge analysis/);
 });
+
+test("footer shows the routed marker and the accepted-on-consensus marker (§22.4/§23.1)", () => {
+  const routed = renderText(result({ panel: undefined, analysis: undefined, routeCategory: "math", model: "openai/gpt-5.2" }), { showAnalysis: false });
+  assert.match(routed, /panel: routed \(math\)/);
+  assert.match(routed, /writer: openai\/gpt-5\.2/);
+
+  const accepted = renderText(result({ acceptedOnConsensus: true, model: "google/gemini-3.1-pro-preview" }), { showAnalysis: false });
+  assert.match(accepted, /writer: google\/gemini-3\.1-pro-preview \(accepted on consensus\)/);
+});

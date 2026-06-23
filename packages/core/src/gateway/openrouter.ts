@@ -115,13 +115,14 @@ export class OpenRouterGateway implements ChatGateway {
       throw new FusionixError("gateway_error", "Gateway returned a non-JSON response.", { cause });
     }
 
-    const choices = data.choices as Array<{ message?: { content?: unknown } }> | undefined;
+    const choices = data.choices as Array<{ message?: { content?: unknown }; finish_reason?: unknown }> | undefined;
     const content = contentToString(choices?.[0]?.message?.content ?? "");
     const result: GatewayCallResult = { content, raw: data };
     const usage = toUsage(data.usage);
     if (usage) result.usage = usage;
     if (typeof data.id === "string") result.id = data.id;
     if (typeof data.model === "string") result.model = data.model;
+    if (typeof choices?.[0]?.finish_reason === "string") result.finishReason = choices[0].finish_reason;
     return result;
   }
 
@@ -161,6 +162,7 @@ export class OpenRouterGateway implements ChatGateway {
     let usage: GatewayUsage | undefined;
     let id: string | undefined;
     let model: string | undefined;
+    let finishReason: string | undefined;
 
     const handle = (line: string): string | undefined => {
       const trimmed = line.trim();
@@ -173,11 +175,12 @@ export class OpenRouterGateway implements ChatGateway {
       } catch {
         return undefined;
       }
-      const choices = chunk.choices as Array<{ delta?: { content?: unknown } }> | undefined;
+      const choices = chunk.choices as Array<{ delta?: { content?: unknown }; finish_reason?: unknown }> | undefined;
       const delta = choices?.[0]?.delta?.content;
       if (chunk.usage) usage = toUsage(chunk.usage);
       if (typeof chunk.id === "string") id = chunk.id;
       if (typeof chunk.model === "string") model = chunk.model;
+      if (typeof choices?.[0]?.finish_reason === "string") finishReason = choices[0].finish_reason;
       return typeof delta === "string" && delta.length > 0 ? delta : undefined;
     };
 
@@ -212,6 +215,7 @@ export class OpenRouterGateway implements ChatGateway {
     if (usage) result.usage = usage;
     if (id) result.id = id;
     if (model) result.model = model;
+    if (finishReason) result.finishReason = finishReason;
     return result;
   }
 

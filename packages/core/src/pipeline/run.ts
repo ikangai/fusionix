@@ -152,10 +152,13 @@ export async function runFusionix(
     let answer: string;
     let modelUsed: string;
     let writerCalls: GatewayCallResult[];
+    let modelSelected: boolean;
+    let finishReason: string | undefined;
     if (accepted) {
       answer = accepted.answer ?? "";
       modelUsed = accepted.model;
       writerCalls = [];
+      modelSelected = true; // the answering model is a panelist, not the configured writer
     } else {
       // Adaptive aggregator (§22.2): optionally pick the writer from the surviving panel
       // models (judge ranking or capability prior). Defaults to plan.writer ("fixed").
@@ -169,6 +172,8 @@ export async function runFusionix(
       answer = out.answer;
       modelUsed = writerPlan.writer;
       writerCalls = [out.call];
+      modelSelected = chosenWriter !== plan.writer;
+      finishReason = out.call.finishReason;
     }
 
     const allCalls = [...panelCalls, ...debateCalls, ...judgeCalls, ...writerCalls];
@@ -188,6 +193,8 @@ export async function runFusionix(
       created: Math.floor(startedAt / 1000),
     };
     if (accepted) result.acceptedOnConsensus = true;
+    if (modelSelected) result.modelSelected = true;
+    if (finishReason) result.finishReason = finishReason;
     return result;
   } finally {
     clearTimeout(timer);

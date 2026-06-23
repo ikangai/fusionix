@@ -55,7 +55,7 @@ export interface ChatCompletionResponse {
   object: "chat.completion";
   created: number;
   model: string;
-  choices: { index: number; message: { role: "assistant"; content: string }; finish_reason: "stop" }[];
+  choices: { index: number; message: { role: "assistant"; content: string }; finish_reason: string }[];
   usage: Usage;
   fusionix: FusionixExtrasWire;
 }
@@ -102,6 +102,10 @@ export function toChatCompletion(result: FusionixRunResult): ChatCompletionRespo
   if (result.routeCategory !== undefined) {
     fusionix.route_category = result.routeCategory;
     fusionix.model_used = result.model;
+  } else if (result.modelSelected) {
+    // Adaptive writer (§22.2) or accept-gate (§23.1): the answering model isn't the
+    // configured writer, so expose it (consistent with the CLI footer and the run log).
+    fusionix.model_used = result.model;
   }
   // Accept-gate runs (§23.1) flag that the writer was skipped on consensus.
   if (result.acceptedOnConsensus) fusionix.accepted_on_consensus = true;
@@ -111,7 +115,7 @@ export function toChatCompletion(result: FusionixRunResult): ChatCompletionRespo
     object: "chat.completion",
     created: result.created,
     model: "fusionix",
-    choices: [{ index: 0, message: { role: "assistant", content: result.answer }, finish_reason: "stop" }],
+    choices: [{ index: 0, message: { role: "assistant", content: result.answer }, finish_reason: result.finishReason ?? "stop" }],
     usage: result.usage,
     fusionix,
   };

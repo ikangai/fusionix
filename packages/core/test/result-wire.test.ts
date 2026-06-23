@@ -102,3 +102,22 @@ test("accepted_on_consensus surfaces only when the writer was skipped (§23.1)",
   const normal = toChatCompletion(baseResult({}));
   assert.ok(!("accepted_on_consensus" in normal.fusionix), "absent on a normal run");
 });
+
+test("chain shape (panel set, analysis absent) is classified NON-bypass with full extras (§23.4)", () => {
+  const r = toChatCompletion(baseResult({ panel: [{ model: "m", answer: "a" }], analysis: undefined, judge: undefined }));
+  assert.ok("cost_usd" in r.fusionix, "cost_usd present (not bypass-shaped)");
+  assert.ok("max_tool_calls_enforced" in r.fusionix);
+  assert.ok(r.fusionix.panel, "panel present");
+  assert.equal(r.fusionix.analysis, undefined, "no analysis in chain mode");
+});
+
+test("finish_reason reflects the answering call and defaults to 'stop' (§6.3)", () => {
+  assert.equal(toChatCompletion(baseResult({})).choices[0]!.finish_reason, "stop");
+  assert.equal(toChatCompletion(baseResult({ finishReason: "length" })).choices[0]!.finish_reason, "length");
+});
+
+test("model_used surfaces for an adaptively-selected/accepted model, not a plain run (§22.2/§23.1)", () => {
+  const adaptive = toChatCompletion(baseResult({ model: "openai/gpt-5.2", modelSelected: true }));
+  assert.equal(adaptive.fusionix.model_used, "openai/gpt-5.2");
+  assert.ok(!("model_used" in toChatCompletion(baseResult({})).fusionix), "absent on a fixed-writer run");
+});
