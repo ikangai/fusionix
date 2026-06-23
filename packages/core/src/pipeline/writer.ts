@@ -29,9 +29,11 @@ export async function runWriter(
   prompt: string,
   analysis: FusionixAnalysis,
   deps: WriterDeps,
+  /** Extra panel context per the access-list (§23.3); undefined = judge analysis only. */
+  panelContext?: string,
 ): Promise<WriterOutcome> {
   const systemText = composeSystem(WRITER_SYSTEM, plan.writerSystem);
-  const user = renderWriterUser(prompt, JSON.stringify(analysis));
+  const user = renderWriterUser(prompt, JSON.stringify(analysis), panelContext);
 
   // Writer never uses web.
   const req = makeChatRequest(

@@ -93,4 +93,10 @@ test("renderJudgeUser and renderWriterUser format with labels", () => {
   const w = renderWriterUser("What is X?", '{"consensus":[]}');
   assert.match(w, /User question:\nWhat is X\?/);
   assert.match(w, /Judge analysis:\n\{"consensus":\[\]\}/);
+  assert.doesNotMatch(w, /Panel answers:/, "no panel block by default");
+});
+
+test("v0.10: renderWriterUser appends the panel answers when access is granted (§23.3)", () => {
+  const w = renderWriterUser("Q", "{}", "[1] m\nthe answer");
+  assert.match(w, /Panel answers:\n\[1\] m\nthe answer/);
 });

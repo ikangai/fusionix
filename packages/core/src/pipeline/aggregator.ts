@@ -17,6 +17,7 @@
  */
 import { pickBestModel, detectCategory } from "../capabilities.ts";
 import { userTurnsText } from "../messages.ts";
+import { renderAnswers } from "../prompts.ts";
 import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../types.ts";
 
 /**
@@ -90,7 +91,12 @@ export function acceptTopOnConsensus(
 ): PanelResponse | undefined {
   if (survivors.length === 0) return undefined;
   if (analysis.contradictions.length > 0 || analysis.blindSpots.length > 0) return undefined;
+  return pickTopSurvivor(analysis, survivors);
+}
 
+/** The judge's #1 ranked survivor (else the first survivor); undefined for an empty pool. */
+function pickTopSurvivor(analysis: FusionixAnalysis, survivors: PanelResponse[]): PanelResponse | undefined {
+  if (survivors.length === 0) return undefined;
   const models = survivors.map((s) => s.model);
   for (const entry of analysis.ranking) {
     const resolved = resolveRankedModel(entry, models);
@@ -100,4 +106,28 @@ export function acceptTopOnConsensus(
     }
   }
   return survivors[0];
+}
+
+/**
+ * Access-list writer context (v0.10 §23.3; Conductor's `access_list` = pure prompt-string
+ * selection). Returns the extra panel text the writer should see beyond the judge analysis,
+ * per `plan.writerAccess`: "judge+panel" → all surviving answers; "judge+top" → only the
+ * top-ranked survivor's answer; default ("judge") → undefined (analysis only, unchanged).
+ */
+export function writerPanelContext(
+  plan: ExecutionPlan,
+  analysis: FusionixAnalysis,
+  survivors: PanelResponse[],
+): string | undefined {
+  if (survivors.length === 0) return undefined;
+  switch (plan.writerAccess) {
+    case "judge+panel":
+      return renderAnswers(survivors);
+    case "judge+top": {
+      const top = pickTopSurvivor(analysis, survivors);
+      return top ? renderAnswers([top]) : undefined;
+    }
+    default:
+      return undefined;
+  }
 }

@@ -75,6 +75,8 @@ export function renderJudgeUser(prompt: string, answers: string): string {
   return `User question:\n${prompt}\n\nAnswers:\n${answers}`;
 }
 
-export function renderWriterUser(prompt: string, analysisJson: string): string {
-  return `User question:\n${prompt}\n\nJudge analysis:\n${analysisJson}`;
+export function renderWriterUser(prompt: string, analysisJson: string, panelContext?: string): string {
+  const base = `User question:\n${prompt}\n\nJudge analysis:\n${analysisJson}`;
+  // §23.3 access-list: optionally append the panel answers the writer is granted.
+  return panelContext ? `${base}\n\nPanel answers:\n${panelContext}` : base;
 }

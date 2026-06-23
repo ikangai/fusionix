@@ -19,7 +19,7 @@ import { runJudge } from "./judge.ts";
 import { runWriter } from "./writer.ts";
 import { runBypass } from "./bypass.ts";
 import { runDebate } from "./debate.ts";
-import { chooseWriter, acceptTopOnConsensus } from "./aggregator.ts";
+import { chooseWriter, acceptTopOnConsensus, writerPanelContext } from "./aggregator.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
@@ -155,7 +155,9 @@ export async function runFusionix(
       const writerPlan = chosenWriter === plan.writer ? plan : { ...plan, writer: chosenWriter };
       opts.onProgress?.("writer");
       const writerDeps = opts.onWriterDelta ? { ...deps, onDelta: opts.onWriterDelta } : deps;
-      const out = await runWriter(writerPlan, prompt, analysis, writerDeps);
+      // Access-list (§23.3): grant the writer extra panel context per plan.writerAccess.
+      const panelCtx = writerPanelContext(plan, analysis, survivorResponses);
+      const out = await runWriter(writerPlan, prompt, analysis, writerDeps, panelCtx);
       answer = out.answer;
       modelUsed = writerPlan.writer;
       writerCalls = [out.call];

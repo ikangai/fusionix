@@ -67,6 +67,26 @@ function judgeSystemOf(calls: ChatRequest[]): string {
   return typeof sys?.content === "string" ? sys.content : "";
 }
 
+function writerUserOf(calls: ChatRequest[]): string {
+  const w = calls.find((c) => stageOf(c) === "writer");
+  const u = w?.messages.find((m) => m.role === "user");
+  return typeof u?.content === "string" ? u.content : "";
+}
+
+test("writer-access 'judge+panel' grants the writer the raw panel answers (§23.3)", async () => {
+  const { gateway, calls } = gatewayWith([]);
+  await runFusionix(fx({ writer_access: "judge+panel" }), { config: config(), gateway, apiKey: "x" });
+  const wu = writerUserOf(calls);
+  assert.match(wu, /Panel answers:/);
+  assert.match(wu, /ans-openai\/gpt-5\.2/, "a panel answer is present in the writer prompt");
+});
+
+test("writer-access default ('judge') shows the writer only the analysis, not the panel (§23.3)", async () => {
+  const { gateway, calls } = gatewayWith([]);
+  await runFusionix(fx({}), { config: config(), gateway, apiKey: "x" });
+  assert.doesNotMatch(writerUserOf(calls), /Panel answers:/);
+});
+
 test("top-ranked adds the model-id ranking instruction to the judge prompt; default does not (§22.2)", async () => {
   const a = gatewayWith([GEMINI]);
   await runFusionix(fx({ writer_strategy: "top-ranked" }), { config: config(), gateway: a.gateway, apiKey: "x" });

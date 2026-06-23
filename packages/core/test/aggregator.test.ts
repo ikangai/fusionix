@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRankedModel, chooseWriter, acceptTopOnConsensus } from "../src/pipeline/aggregator.ts";
+import { resolveRankedModel, chooseWriter, acceptTopOnConsensus, writerPanelContext } from "../src/pipeline/aggregator.ts";
 import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../src/types.ts";
 
 const OPUS = "anthropic/claude-opus-4.8";
@@ -106,4 +106,23 @@ test("acceptTopOnConsensus does NOT fire when there are contradictions or blind 
 
 test("acceptTopOnConsensus returns undefined with no survivors", () => {
   assert.equal(acceptTopOnConsensus(analysis([OPUS]), []), undefined);
+});
+
+// ---- writerPanelContext (§23.3 access-list) ------------------------------
+
+test("writerPanelContext: 'judge' adds nothing, 'judge+panel' renders all, 'judge+top' renders the top survivor", () => {
+  const survivors = [survivor(OPUS, "a-opus"), survivor(GPT, "a-gpt")];
+  assert.equal(writerPanelContext(plan(), analysis([]), survivors), undefined);
+
+  const all = writerPanelContext(plan({ writerAccess: "judge+panel" }), analysis([]), survivors) ?? "";
+  assert.match(all, /a-opus/);
+  assert.match(all, /a-gpt/);
+
+  const top = writerPanelContext(plan({ writerAccess: "judge+top" }), analysis([GPT, OPUS]), survivors) ?? "";
+  assert.match(top, /a-gpt/, "top-ranked survivor included");
+  assert.doesNotMatch(top, /a-opus/, "non-top survivor excluded");
+});
+
+test("writerPanelContext returns undefined for an empty survivor pool", () => {
+  assert.equal(writerPanelContext(plan({ writerAccess: "judge+panel" }), analysis([]), []), undefined);
 });
