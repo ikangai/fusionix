@@ -7,7 +7,7 @@
  * → validate.
  */
 import { FusionixError } from "./errors.ts";
-import { foldRoles, hasUserMessage, renderCompactPrompt } from "./messages.ts";
+import { foldRoles, hasUserMessage, contentToString } from "./messages.ts";
 import { defaultRandomId } from "./util.ts";
 import { providerOf, detectCategory, pickBestModel } from "./capabilities.ts";
 import type {
@@ -121,14 +121,22 @@ export function normalizeRequest(
 
   // Single-model routing (§22.4): fusionix picks the best-fit model from the pool and
   // runs it as a single-model call (bypass mechanics). Resolved here so behavior stays
-  // deterministic before any gateway call (§6.8). An explicit `enabled:false` bypass wins.
-  const routing = (plugin?.route === true || preset?.route === true) && !bypass;
+  // deterministic before any gateway call (§6.8). Only applies to the `fusionix`
+  // meta-model: an explicit concrete `model` (writer) or `enabled:false` bypass wins, so
+  // a named model is never silently swapped for a routed pick.
+  const routing = (plugin?.route === true || preset?.route === true) && !bypass && isFusionixModel;
   let routeCategory: string | undefined;
   if (routing) {
     if (panel.length === 0) {
       throw new FusionixError("invalid_request", "Routing requires a non-empty panel/pool to choose from.");
     }
-    const category = detectCategory(renderCompactPrompt(request.messages));
+    // Detect over the user's question only — not caller system/persona text, which is
+    // usually fixed across turns and would otherwise pin every query to one category.
+    const userText = request.messages
+      .filter((m) => m.role === "user")
+      .map((m) => contentToString(m.content))
+      .join("\n");
+    const category = detectCategory(userText);
     const routed = pickBestModel(panel, category);
     if (routed) {
       writer = routed;

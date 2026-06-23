@@ -61,3 +61,9 @@ test("detectCategory matches the most specific category first", () => {
   assert.equal(detectCategory("Who was the first president?"), "recall");
   assert.equal(detectCategory("Tell me a story about a dog"), "general");
 });
+
+test("detectCategory uses a word boundary for 'code' (no 'decode'/'barcode' false positives)", () => {
+  assert.equal(detectCategory("Decode this base64 string"), "general");
+  assert.equal(detectCategory("What does a barcode encode?"), "general");
+  assert.equal(detectCategory("Write code for a linked list"), "coding");
+});

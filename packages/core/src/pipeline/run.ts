@@ -18,6 +18,7 @@ import { runPanel } from "./panel.ts";
 import { runJudge } from "./judge.ts";
 import { runWriter } from "./writer.ts";
 import { runBypass } from "./bypass.ts";
+import { chooseWriter } from "./aggregator.ts";
 import type { ChatGateway } from "../gateway/contract.ts";
 import type { GatewayClientOptions } from "../gateway/openrouter.ts";
 import type {
@@ -120,16 +121,22 @@ export async function runFusionix(
     opts.onProgress?.("judge");
     const { analysis, calls: judgeCalls } = await runJudge(plan, prompt, responses, deps);
 
+    // Adaptive aggregator (§22.2): optionally pick the writer from the surviving panel
+    // models (judge ranking or capability prior). Defaults to plan.writer ("fixed").
+    const survivors = successes.map((r) => r.model);
+    const chosenWriter = chooseWriter(plan, analysis, survivors, prompt);
+    const writerPlan = chosenWriter === plan.writer ? plan : { ...plan, writer: chosenWriter };
+
     opts.onProgress?.("writer");
     const writerDeps = opts.onWriterDelta ? { ...deps, onDelta: opts.onWriterDelta } : deps;
-    const { answer, call: writerCall } = await runWriter(plan, prompt, analysis, writerDeps);
+    const { answer, call: writerCall } = await runWriter(writerPlan, prompt, analysis, writerDeps);
 
     const allCalls = [...panelCalls, ...judgeCalls, writerCall];
     const { usage, costUsd } = await finalizeCost(deps.gateway, allCalls);
     const result: FusionixRunResult = {
       runId: plan.runId,
       answer,
-      model: plan.writer,
+      model: writerPlan.writer,
       judge: plan.judge,
       panel: responses,
       analysis,

@@ -1,0 +1,72 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { resolveRankedModel, chooseWriter } from "../src/pipeline/aggregator.ts";
+import type { ExecutionPlan, FusionixAnalysis } from "../src/types.ts";
+
+const OPUS = "anthropic/claude-opus-4.8";
+const GPT = "openai/gpt-5.2";
+const GEMINI = "google/gemini-3.1-pro-preview";
+const SURVIVORS = [OPUS, GPT, GEMINI];
+
+function analysis(ranking: string[]): FusionixAnalysis {
+  return { consensus: [], contradictions: [], partialCoverage: [], uniqueInsights: [], blindSpots: [], ranking };
+}
+function plan(over: Partial<ExecutionPlan> = {}): ExecutionPlan {
+  return {
+    runId: "r", panel: SURVIVORS, judge: GPT, writer: GPT, web: true, bypass: false, maxToolCalls: 8, messages: [],
+    ...over,
+  };
+}
+
+// ---- resolveRankedModel --------------------------------------------------
+
+test("resolveRankedModel matches an exact slug (case-insensitive)", () => {
+  assert.equal(resolveRankedModel(GEMINI, SURVIVORS), GEMINI);
+  assert.equal(resolveRankedModel("OPENAI/GPT-5.2", SURVIVORS), GPT);
+});
+
+test("resolveRankedModel maps a bare or bracketed index to the nth survivor", () => {
+  assert.equal(resolveRankedModel("1", SURVIVORS), OPUS);
+  assert.equal(resolveRankedModel("[2]", SURVIVORS), GPT);
+  assert.equal(resolveRankedModel("4", SURVIVORS), undefined, "out-of-range index");
+});
+
+test("resolveRankedModel falls back to a substring/family match, else undefined", () => {
+  assert.equal(resolveRankedModel("gemini", SURVIVORS), GEMINI);
+  assert.equal(resolveRankedModel(`${GPT}:online`, SURVIVORS), GPT);
+  assert.equal(resolveRankedModel("totally unrelated", SURVIVORS), undefined);
+  assert.equal(resolveRankedModel("", SURVIVORS), undefined);
+});
+
+// ---- chooseWriter --------------------------------------------------------
+
+test("chooseWriter 'fixed' (default) returns plan.writer untouched", () => {
+  assert.equal(chooseWriter(plan(), analysis([GEMINI, OPUS, GPT]), SURVIVORS, "q"), GPT);
+});
+
+test("chooseWriter 'top-ranked' returns the judge's #1 surviving model", () => {
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI, OPUS, GPT]), SURVIVORS, "q"), GEMINI);
+});
+
+test("chooseWriter 'top-ranked' skips unresolvable entries, then falls back to plan.writer", () => {
+  // First entry unresolvable, second resolves to OPUS.
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", OPUS]), SURVIVORS, "q"), OPUS);
+  // Nothing resolves → fall back to the configured writer.
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", "!!!"]), SURVIVORS, "q"), GPT);
+});
+
+test("chooseWriter 'capability' picks the best-fit survivor for the detected category", () => {
+  assert.equal(chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "Prove the theorem"), GPT);
+  assert.equal(
+    chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "Explain the chemistry of this enzyme"),
+    GEMINI,
+  );
+});
+
+test("chooseWriter 'capability' keeps plan.writer for a category-less ('general') prompt", () => {
+  assert.equal(chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "tell me a story"), GPT);
+});
+
+test("chooseWriter returns plan.writer when there are no survivors", () => {
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI]), [], "q"), GPT);
+});

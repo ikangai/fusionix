@@ -90,11 +90,13 @@ export function pickBestModel(models: string[], category: Capability): string | 
 }
 
 // Checked in order; the first category with a keyword hit wins, so the more
-// specific categories (debugging, cybersecurity) precede the broader ones.
-const CATEGORY_KEYWORDS: readonly { category: Capability; words: readonly string[] }[] = [
+// specific categories (debugging, cybersecurity) precede the broader ones. Plain
+// strings match as substrings; RegExp keywords (e.g. /\bcode\b/) guard short, common
+// tokens against collisions like "decode" → coding.
+const CATEGORY_KEYWORDS: readonly { category: Capability; words: readonly (string | RegExp)[] }[] = [
   { category: "debugging", words: ["debug", "stack trace", "stacktrace", "traceback", "segfault", "panic", "fix the bug", "why is this failing"] },
   { category: "cybersecurity", words: ["vulnerability", "exploit", "cve-", "malware", "encrypt", "decrypt", "penetration test", "xss", "sql injection", "buffer overflow", "cryptanalysis"] },
-  { category: "coding", words: ["code", "function", "implement", "refactor", "compile", "typescript", "python", "javascript", "algorithm", "regex", "unit test"] },
+  { category: "coding", words: [/\bcode\b/, "function", "implement", "refactor", "compile", "typescript", "python", "javascript", "algorithm", "regex", "unit test"] },
   { category: "math", words: ["prove", "theorem", "integral", "derivative", "equation", "polynomial", "matrix", "probability", "algebra", "calculus", "factorial"] },
   { category: "science", words: ["chemistry", "biology", "physics", "molecule", "reaction", "protein", "quantum", "genome", "thermodynamics", "enzyme"] },
   { category: "recall", words: ["who was", "who is", "when did", "what year", "history of", "capital of", "trivia", "named after", "biography of"] },
@@ -108,7 +110,7 @@ const CATEGORY_KEYWORDS: readonly { category: Capability; words: readonly string
 export function detectCategory(text: string): Capability {
   const t = text.toLowerCase();
   for (const { category, words } of CATEGORY_KEYWORDS) {
-    if (words.some((w) => t.includes(w))) return category;
+    if (words.some((w) => (typeof w === "string" ? t.includes(w) : w.test(t)))) return category;
   }
   return "general";
 }

@@ -15,6 +15,8 @@ Return JSON:
 
 export const JUDGE_SYSTEM = `You compare several model answers to the same user question.
 Do not write the final answer. Compare the answers.
+Each answer is labelled "[n] <model-id>". In "ranking", list the <model-id> values
+(the identifier after the bracketed number, e.g. "openai/gpt-5.2"), best answer first.
 Return JSON:
 { "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }`;
 
@@ -22,7 +24,7 @@ export const WRITER_SYSTEM = `Write the final answer to the user's question usin
 Rules:
 - Lead with the answer.
 - Use consensus as high-confidence material.
-- Mention important disagreements when relevant.
+- When the panel disagrees, resolve it: weigh the evidence, decide which side is correct, and state the resolution — do not merely report that a disagreement exists.
 - Preserve useful unique insights.
 - Do not mention the panel, judge, or internal process.`;
 

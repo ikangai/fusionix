@@ -180,6 +180,44 @@ test("explicit enabled:false bypass wins over route (route ignored)", () => {
   assert.equal(plan.routeCategory, undefined, "routing did not run");
 });
 
+test("route is ignored for an explicit (non-fusionix) writer model — no silent swap", () => {
+  // Caller names GEMINI explicitly and asks a math question; routing must NOT swap to GPT.
+  const plan = normalizeRequest(
+    req({ model: GEMINI, messages: [msg("Prove the theorem about polynomial roots")], plugins: [{ id: "fusionix", route: true }] }),
+    config,
+    RID,
+  );
+  assert.equal(plan.writer, GEMINI, "explicit model honored");
+  assert.equal(plan.bypass, false, "stays a normal deliberation run");
+  assert.equal(plan.routeCategory, undefined, "routing did not run");
+});
+
+test("routing detects the category from the user turn only, not the system prompt", () => {
+  const plan = normalizeRequest(
+    req({
+      model: "fusionix",
+      messages: [
+        { role: "system", content: "You are a debugging assistant. Fix the bug, trace the stack trace." },
+        msg("Tell me a story about a dog"),
+      ],
+      plugins: [{ id: "fusionix", route: true }],
+    }),
+    config,
+    RID,
+  );
+  // System message keywords (debug/stack trace) must NOT pin the category.
+  assert.equal(plan.routeCategory, "general", "system persona keywords are ignored");
+});
+
+test("whitespace-only provider filter names are a no-op", () => {
+  const plan = normalizeRequest(
+    req({ model: "fusionix", messages: [msg("q")], plugins: [{ id: "fusionix", exclude_providers: ["   ", ""] }] }),
+    config,
+    RID,
+  );
+  assert.deepEqual(plan.panel, [OPUS, GPT, GEMINI], "blank names drop nothing");
+});
+
 // ---- preset-level options ------------------------------------------------
 
 test("preset-level writerStrategy/topology/route resolve onto the plan", () => {

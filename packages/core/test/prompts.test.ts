@@ -21,6 +21,17 @@ test("system prompts carry the §14 instructions and JSON shapes", () => {
   assert.match(WRITER_SYSTEM, /Do not mention the panel/);
 });
 
+test("v0.9: judge ranks by model-id and writer resolves disagreements (§22.2)", () => {
+  // Ranking must be keyed on the model identifier so the adaptive aggregator can map it.
+  assert.match(JUDGE_SYSTEM, /model-id/);
+  assert.match(JUDGE_SYSTEM, /ranking/);
+  // The QA harness routes by the JUDGE_SYSTEM prefix; keep the first line intact.
+  assert.ok(JUDGE_SYSTEM.startsWith("You compare several model answers"), "JUDGE_MARK prefix preserved");
+  // Writer is instructed to resolve, not merely report, disagreements.
+  assert.match(WRITER_SYSTEM, /resolve it/);
+  assert.ok(WRITER_SYSTEM.startsWith("Write the final answer"), "WRITER_MARK prefix preserved");
+});
+
 test("composeSystem appends a preset system prompt when present", () => {
   assert.equal(composeSystem("BASE"), "BASE");
   assert.equal(composeSystem("BASE", "EXTRA"), "BASE\n\nEXTRA");
