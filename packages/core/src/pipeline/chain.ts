@@ -79,13 +79,14 @@ export async function runChain(
         ],
         webOpts,
       );
+      // The call succeeded; count it for cost regardless of content (mirrors the panel).
+      calls.push(result);
       if (!result.content || result.content.trim().length === 0) {
         steps.push({ model, error: { message: "Model returned an empty response." } });
         continue;
       }
       const step = parsePanelContent(model, result.content);
       steps.push(step);
-      calls.push(result);
       if (usedWeb) webUsed = true;
       context += `\n[${model}] ${step.answer ?? ""}`;
     } catch (err) {

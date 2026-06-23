@@ -186,9 +186,9 @@ Standalone tool: `node qa/ab-eval.mjs` — deliberation-vs-best-panelist structu
 |----|---------|---------------------|
 | O1 | `--accept-on-consensus` on consensus (§23.1) | writer skipped; `accepted_on_consensus`; answer == a panel answer. |
 | O2 | `--accept-on-consensus` with disagreement (§23.1) | gate does not fire; writer runs. |
-| O3 | `--writer-access judge+panel` (§23.3) | runs; produces an answer over the full panel. |
+| O3 | `--writer-access judge+panel` (§23.3) | runs and returns an answer (the panel→writer context plumbing is asserted by unit tests). |
 | O4 | `--topology chain` (§23.4) | sequential steps; no analysis; panel carries chain step outputs. |
-| O5 | `--topology chain` panel-only (§23.4) | runs with no judge model. |
+| O5 | chain preset with empty `judge` (§23.4) | succeeds — the no-judge relaxation is load-bearing (a non-chain run with empty judge would fail). |
 | EC-O6a | invalid `--writer-access` | exit 2 (usage error). |
 | O7 | no v0.10 flags | behavior == default deliberation (regression guard). |
 

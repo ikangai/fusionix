@@ -57,10 +57,13 @@ test("a step that fails is kept in place; the chain finalizes on the last good s
   assert.ok(r.panel?.[1]?.error, "B kept as a failed step");
 });
 
-test("an empty step is kept as a failure and not used as the answer", async () => {
+test("an empty step is kept as a failure and not used as the answer, but is still billed", async () => {
   const { gateway } = gw((req) => ({ content: req.model === "C" ? "   " : JSON.stringify({ answer: `ok-${req.model}` }), usage }));
   const r = await runChain(plan(["A", "B", "C"]), deps(gateway), {}, 0, now);
   assert.equal(r.answer, "ok-B", "falls back to the last step with content");
+  // The empty step's call still consumed tokens — count it for cost (mirrors the panel).
+  assert.equal(r.usage.total_tokens, 6, "all three billed calls counted");
+  assert.ok(Math.abs((r.costUsd ?? 0) - 0.3) < 1e-9, "all three billed calls' cost counted");
 });
 
 test("all steps failing → all_panel_failed", async () => {

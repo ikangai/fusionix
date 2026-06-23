@@ -27,25 +27,36 @@ import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../types.ts
  * exact slug match → "[n]"/"n" index → substring match (family name, or `:online`).
  */
 export function resolveRankedModel(entry: string, survivors: string[]): string | undefined {
+  const i = resolveRankedIndex(entry, survivors);
+  return i !== undefined ? survivors[i] : undefined;
+}
+
+/**
+ * Like {@link resolveRankedModel} but returns the matched POSITION, so callers that hold the
+ * full survivor objects can select the exact entry even when the panel repeats a model slug
+ * (a bare `[2]` selects the second survivor, not the first with that slug).
+ */
+export function resolveRankedIndex(entry: string, models: string[]): number | undefined {
   const e = entry.trim();
   if (e.length === 0) return undefined;
   const lower = e.toLowerCase();
 
-  const exact = survivors.find((m) => m.toLowerCase() === lower);
-  if (exact) return exact;
+  const exact = models.findIndex((m) => m.toLowerCase() === lower);
+  if (exact !== -1) return exact;
 
   // A purely numeric token is an index reference, never a substring to fuzzy-match
   // (otherwise "4" would match the "4" in "claude-opus-4.8"). Out of range → unresolved.
   const idxMatch = e.match(/^\[?(\d+)\]?$/);
   if (idxMatch) {
     const k = Number(idxMatch[1]);
-    return k >= 1 && k <= survivors.length ? survivors[k - 1] : undefined;
+    return k >= 1 && k <= models.length ? k - 1 : undefined;
   }
 
-  return survivors.find((m) => {
+  const sub = models.findIndex((m) => {
     const ml = m.toLowerCase();
     return ml.includes(lower) || lower.includes(ml);
   });
+  return sub !== -1 ? sub : undefined;
 }
 
 /**
@@ -99,11 +110,9 @@ function pickTopSurvivor(analysis: FusionixAnalysis, survivors: PanelResponse[])
   if (survivors.length === 0) return undefined;
   const models = survivors.map((s) => s.model);
   for (const entry of analysis.ranking) {
-    const resolved = resolveRankedModel(entry, models);
-    if (resolved) {
-      const match = survivors.find((s) => s.model === resolved);
-      if (match) return match;
-    }
+    // Resolve POSITIONALLY so a duplicate-slug panel keeps each entry's identity.
+    const idx = resolveRankedIndex(entry, models);
+    if (idx !== undefined) return survivors[idx];
   }
   return survivors[0];
 }

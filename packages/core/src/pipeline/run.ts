@@ -143,8 +143,11 @@ export async function runFusionix(
     const survivors = survivorResponses.map((r) => r.model);
 
     // Verifier accept-gate (§23.1): on full judge consensus, accept the top panelist's
-    // answer and skip the writer synthesis entirely (one fewer model call).
-    const accepted = plan.acceptOnConsensus ? acceptTopOnConsensus(analysis, survivorResponses) : undefined;
+    // answer and skip the writer synthesis entirely (one fewer model call). An empty
+    // accepted answer falls through to the writer, so the run never returns empty content
+    // (the writer path surfaces writer_failed instead, matching every other terminal path).
+    const candidate = plan.acceptOnConsensus ? acceptTopOnConsensus(analysis, survivorResponses) : undefined;
+    const accepted = candidate && (candidate.answer ?? "").trim().length > 0 ? candidate : undefined;
 
     let answer: string;
     let modelUsed: string;

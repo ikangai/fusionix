@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRankedModel, chooseWriter, acceptTopOnConsensus, writerPanelContext } from "../src/pipeline/aggregator.ts";
+import { resolveRankedModel, resolveRankedIndex, chooseWriter, acceptTopOnConsensus, writerPanelContext } from "../src/pipeline/aggregator.ts";
 import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../src/types.ts";
 
 const OPUS = "anthropic/claude-opus-4.8";
@@ -37,6 +37,13 @@ test("resolveRankedModel falls back to a substring/family match, else undefined"
   assert.equal(resolveRankedModel(`${GPT}:online`, SURVIVORS), GPT);
   assert.equal(resolveRankedModel("totally unrelated", SURVIVORS), undefined);
   assert.equal(resolveRankedModel("", SURVIVORS), undefined);
+});
+
+test("resolveRankedIndex returns the matched position (exact, index, substring, miss)", () => {
+  assert.equal(resolveRankedIndex(GEMINI, SURVIVORS), 2);
+  assert.equal(resolveRankedIndex("[2]", SURVIVORS), 1);
+  assert.equal(resolveRankedIndex("gemini", SURVIVORS), 2);
+  assert.equal(resolveRankedIndex("nope", SURVIVORS), undefined);
 });
 
 // ---- chooseWriter --------------------------------------------------------
@@ -106,6 +113,12 @@ test("acceptTopOnConsensus does NOT fire when there are contradictions or blind 
 
 test("acceptTopOnConsensus returns undefined with no survivors", () => {
   assert.equal(acceptTopOnConsensus(analysis([OPUS]), []), undefined);
+});
+
+test("acceptTopOnConsensus selects the right duplicate when the judge ranks by index (positional)", () => {
+  // A panel may legitimately repeat a model slug; an index ranking must hit the right one.
+  const survivors = [survivor("x/a", "first"), survivor("x/b", "mid"), survivor("x/a", "third")];
+  assert.equal(acceptTopOnConsensus(analysis(["[3]"]), survivors)?.answer, "third", "[3] → third survivor, not the first x/a");
 });
 
 // ---- writerPanelContext (§23.3 access-list) ------------------------------

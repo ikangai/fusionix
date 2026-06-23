@@ -201,6 +201,30 @@ test("topology 'chain' runs sequential steps, no judge, last step is the answer 
   assert.equal(calls.filter((c) => stageOf(c) === "judge").length, 0, "no judge call");
 });
 
+test("accept-on-consensus falls through to the writer when the top panelist's answer is empty (§23.1)", async () => {
+  const calls: ChatRequest[] = [];
+  const consensus = JSON.stringify({
+    consensus: ["x"], contradictions: [], partial_coverage: [], unique_insights: [], blind_spots: [], ranking: [GPT],
+  });
+  const gateway: ChatGateway = {
+    async chat(req) {
+      calls.push(req);
+      const u: GatewayCallResult["usage"] = { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.1 };
+      const stage = stageOf(req);
+      if (stage === "panel") {
+        // The judge's #1 (GPT) returns a valid-JSON but EMPTY answer.
+        return { content: JSON.stringify({ answer: req.model === GPT ? "" : `ans-${req.model}` }), usage: u };
+      }
+      if (stage === "judge") return { content: consensus, usage: u };
+      return { content: "FINAL", usage: u };
+    },
+  };
+  const r = await runFusionix(fx({ accept_on_consensus: true }), { config: config(), gateway, apiKey: "x" });
+  assert.notEqual(r.acceptedOnConsensus, true, "did not accept an empty answer");
+  assert.equal(r.answer, "FINAL", "the writer ran instead of returning empty");
+  assert.equal(calls.filter((c) => stageOf(c) === "writer").length, 1);
+});
+
 test("accept-on-consensus does NOT skip the writer when the judge reports a contradiction (§23.1)", async () => {
   const calls: ChatRequest[] = [];
   const withContradiction = JSON.stringify({
