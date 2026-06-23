@@ -35,6 +35,16 @@ export interface FusionixPlugin {
   /** Advisory in v1 (§15). */
   max_tool_calls?: number;
   enabled?: boolean;
+  /** Restrict the resolved panel to these providers, e.g. ["openai","google"] (v0.9 §22.1). */
+  only_providers?: string[];
+  /** Drop these providers from the resolved panel, e.g. ["anthropic"] (v0.9 §22.1). */
+  exclude_providers?: string[];
+  /** Writer-selection strategy: "fixed" (default), "top-ranked", or "capability" (v0.9 §22.2). */
+  writer_strategy?: string;
+  /** Route to a single best-fit model instead of deliberating (v0.9 §22.4). */
+  route?: boolean;
+  /** Panel coordination topology: "standard" (default) or "debate" (v0.9 §22.5). */
+  topology?: string;
 }
 
 export interface FusionixChatCompletionRequest {
@@ -65,6 +75,12 @@ export interface ResolvedPreset {
   panelSystem?: string;
   judgeSystem?: string;
   writerSystem?: string;
+  /** Writer-selection strategy for this preset (v0.9 §22.2). */
+  writerStrategy?: "fixed" | "top-ranked" | "capability";
+  /** Panel coordination topology for this preset (v0.9 §22.5). */
+  topology?: "standard" | "debate";
+  /** When true, this preset routes to a single best-fit model (v0.9 §22.4). */
+  route?: boolean;
 }
 
 export interface FusionixConfigDefaults {
@@ -110,6 +126,12 @@ export interface ExecutionPlan {
   writerSystem?: string;
   /** Resolved preset name; carried for Phase-2 run logging (§16). */
   presetName?: string;
+  /** Writer-selection strategy (v0.9 §22.2); absent means the fixed `writer`. */
+  writerStrategy?: "fixed" | "top-ranked" | "capability";
+  /** Panel coordination topology (v0.9 §22.5); absent means "standard". */
+  topology?: "standard" | "debate";
+  /** Detected query category when the request was routed to a single model (v0.9 §22.4); for logging. */
+  routeCategory?: string;
   /** Caller messages, role-folded (developer→system) but otherwise preserved. */
   messages: ChatMessage[];
 }
@@ -187,7 +209,7 @@ export interface Usage {
 
 export type WebStatus = "used" | "off" | "unsupported";
 
-export type FusionixStage = "panel" | "judge" | "writer";
+export type FusionixStage = "panel" | "debate" | "judge" | "writer";
 
 export interface FusionixRunResult {
   runId: string;
@@ -209,4 +231,6 @@ export interface FusionixRunResult {
   maxToolCallsEnforced: boolean;
   /** Unix seconds, for the OpenAI-compatible `created` field. */
   created: number;
+  /** Detected query category when the run was routed to a single model (v0.9 §22.4). */
+  routeCategory?: string;
 }

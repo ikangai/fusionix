@@ -74,3 +74,30 @@ test("rejects a negative or zero --max-cost", () => {
 test("rejects a non-numeric --max-tool-calls", () => {
   assert.throws(() => parseCliArgs(["q", "--max-tool-calls", "abc"]), /max-tool-calls/);
 });
+
+test("v0.9: parses provider filters (CSV), writer-strategy, topology, route, mode (§22)", () => {
+  const a = parseCliArgs([
+    "q",
+    "--only-provider", "openai, google",
+    "--exclude-provider", "anthropic",
+    "--writer-strategy", "capability",
+    "--topology", "debate",
+    "--route",
+    "--mode", "fast",
+  ]);
+  assert.deepEqual(a.onlyProviders, ["openai", "google"]);
+  assert.deepEqual(a.excludeProviders, ["anthropic"]);
+  assert.equal(a.writerStrategy, "capability");
+  assert.equal(a.topology, "debate");
+  assert.equal(a.route, true);
+  assert.equal(a.mode, "fast");
+});
+
+test("v0.9: route defaults false; provider/strategy flags undefined when omitted", () => {
+  const a = parseCliArgs(["q"]);
+  assert.equal(a.route, false);
+  assert.equal(a.onlyProviders, undefined);
+  assert.equal(a.writerStrategy, undefined);
+  assert.equal(a.topology, undefined);
+  assert.equal(a.mode, undefined);
+});

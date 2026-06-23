@@ -48,6 +48,14 @@ Options:
   --show-analysis         Include judge analysis in md/text output
   --log <path>            Append a JSON run record (JSONL; one line per run)
   --max-cost <usd>        Warn/abort before run when the estimate exceeds this
+
+v0.9 extensions (Fugu-inspired; §22):
+  --only-provider <a,b>   Restrict the panel to these providers
+  --exclude-provider <a>  Drop these providers from the panel
+  --writer-strategy <s>   Aggregator selection: fixed | top-ranked | capability
+  --topology <t>          Panel coordination: standard | debate
+  --route                 Route to a single best-fit model (skip deliberation)
+  --mode <fast|deliberate> Operating point (fast = route to one model)
   --version
   --help
 
@@ -167,6 +175,18 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   }
   if (args.format && !["text", "json", "md"].includes(args.format)) {
     stderr(`fusionix: invalid --format '${args.format}' (expected text|json|md)\n`);
+    return 2;
+  }
+  if (args.writerStrategy && !["fixed", "top-ranked", "capability"].includes(args.writerStrategy)) {
+    stderr(`fusionix: invalid --writer-strategy '${args.writerStrategy}' (expected fixed|top-ranked|capability)\n`);
+    return 2;
+  }
+  if (args.topology && !["standard", "debate"].includes(args.topology)) {
+    stderr(`fusionix: invalid --topology '${args.topology}' (expected standard|debate)\n`);
+    return 2;
+  }
+  if (args.mode && !["fast", "deliberate"].includes(args.mode)) {
+    stderr(`fusionix: invalid --mode '${args.mode}' (expected fast|deliberate)\n`);
     return 2;
   }
 

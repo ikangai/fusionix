@@ -78,6 +78,19 @@ test("non-local in Phase 1 → exit 2 with guidance", async () => {
   assert.equal(h.calls.length, 0);
 });
 
+test("v0.9: invalid --writer-strategy / --topology / --mode → exit 2, no run (§22)", async () => {
+  for (const flag of [
+    ["--writer-strategy", "bogus"],
+    ["--topology", "tree"],
+    ["--mode", "turbo"],
+  ]) {
+    const h = harness();
+    const code = await main(["q", "--local", ...flag], h.deps);
+    assert.equal(code, 2, `${flag[0]} ${flag[1]} should exit 2`);
+    assert.equal(h.calls.length, 0, "must not run the pipeline");
+  }
+});
+
 test("local without OPENROUTER_API_KEY → exit 1", async () => {
   const h = harness({ env: {} });
   const code = await main(["q", "--local"], h.deps);

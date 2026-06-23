@@ -31,3 +31,25 @@ test("--no-web becomes webOverride:false; default leaves it undefined", () => {
   assert.equal(buildRequest(parseCliArgs(["q", "--no-web"]), "q").webOverride, false);
   assert.equal(buildRequest(parseCliArgs(["q"]), "q").webOverride, undefined);
 });
+
+test("v0.9: maps provider filters, writer-strategy, topology and route into the plugin (§22)", () => {
+  const args = parseCliArgs([
+    "q",
+    "--only-provider", "openai,google",
+    "--exclude-provider", "anthropic",
+    "--writer-strategy", "top-ranked",
+    "--topology", "debate",
+    "--route",
+  ]);
+  const plugin = buildRequest(args, "q").request.plugins![0]!;
+  assert.deepEqual(plugin.only_providers, ["openai", "google"]);
+  assert.deepEqual(plugin.exclude_providers, ["anthropic"]);
+  assert.equal(plugin.writer_strategy, "top-ranked");
+  assert.equal(plugin.topology, "debate");
+  assert.equal(plugin.route, true);
+});
+
+test("v0.9: --mode fast is sugar for routing; --mode deliberate does not route", () => {
+  assert.equal(buildRequest(parseCliArgs(["q", "--mode", "fast"]), "q").request.plugins![0]!.route, true);
+  assert.equal(buildRequest(parseCliArgs(["q", "--mode", "deliberate"]), "q").request.plugins![0]!.route, undefined);
+});

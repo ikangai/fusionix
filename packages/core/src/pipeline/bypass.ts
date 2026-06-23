@@ -66,7 +66,7 @@ export async function runBypass(
 
   const { usage, costUsd } = await finalizeCost(deps.gateway, [call]);
   // §6.7: extras carry only run_id, duration_ms and web; omit panel/analysis.
-  return {
+  const result: FusionixRunResult = {
     runId: plan.runId,
     answer: call.content,
     model: plan.writer,
@@ -77,4 +77,8 @@ export async function runBypass(
     maxToolCallsEnforced: false,
     created: Math.floor(startedAt / 1000),
   };
+  // Routing (§22.4) reuses bypass mechanics; surface the detected category so the
+  // run reports which model was auto-selected and why.
+  if (plan.routeCategory !== undefined) result.routeCategory = plan.routeCategory;
+  return result;
 }

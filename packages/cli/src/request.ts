@@ -14,6 +14,13 @@ export function buildRequest(args: ParsedCliArgs, prompt: string): BuiltRequest 
   if (args.panel) plugin.analysis_models = args.panel;
   if (args.judge) plugin.model = args.judge;
   if (args.maxToolCalls !== undefined) plugin.max_tool_calls = args.maxToolCalls;
+  // v0.9 §22 options.
+  if (args.onlyProviders) plugin.only_providers = args.onlyProviders;
+  if (args.excludeProviders) plugin.exclude_providers = args.excludeProviders;
+  if (args.writerStrategy) plugin.writer_strategy = args.writerStrategy;
+  if (args.topology) plugin.topology = args.topology;
+  // `--mode fast` is sugar for routing to a single best-fit model (§22.3).
+  if (args.route || args.mode === "fast") plugin.route = true;
 
   const request: FusionixChatCompletionRequest = {
     model: args.writer ?? "fusionix",

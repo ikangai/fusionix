@@ -83,3 +83,15 @@ test("cost_usd may be null", () => {
   const r = toChatCompletion(baseResult({ costUsd: null }));
   assert.equal(r.fusionix.cost_usd, null);
 });
+
+test("routed runs surface route_category and model_used; non-routed do not (§22.4)", () => {
+  const routed = toChatCompletion(
+    baseResult({ panel: undefined, analysis: undefined, model: "openai/gpt-5.2", routeCategory: "math" }),
+  );
+  assert.equal(routed.fusionix.route_category, "math");
+  assert.equal(routed.fusionix.model_used, "openai/gpt-5.2");
+  // A plain (non-routed) bypass result has neither field.
+  const plain = toChatCompletion(baseResult({ panel: undefined, analysis: undefined }));
+  assert.ok(!("route_category" in plain.fusionix), "no route_category when not routed");
+  assert.ok(!("model_used" in plain.fusionix), "no model_used when not routed");
+});

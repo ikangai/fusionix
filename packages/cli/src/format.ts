@@ -9,7 +9,9 @@ export interface RenderOptions {
 export function footerLine(result: FusionixRunResult): string {
   const panelStr = result.panel
     ? result.panel.map((p) => (p.error ? `${p.model} (failed)` : p.model)).join(", ")
-    : "single model";
+    : result.routeCategory
+      ? `routed (${result.routeCategory})`
+      : "single model";
   const cost = result.costUsd == null ? "n/a" : `$${result.costUsd.toFixed(4)}`;
   const dur = `${(result.durationMs / 1000).toFixed(1)}s`;
   return `panel: ${panelStr} · writer: ${result.model} · web: ${result.web} · cost: ${cost} · ${dur} · ${result.runId}`;

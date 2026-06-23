@@ -23,6 +23,9 @@ interface RawPreset {
   panelSystem?: string;
   judgeSystem?: string;
   writerSystem?: string;
+  writerStrategy?: string;
+  topology?: string;
+  route?: boolean;
 }
 
 interface RawConfig {
@@ -60,6 +63,10 @@ function toPreset(key: string, raw: RawPreset): ResolvedPreset {
   if (raw.panelSystem) preset.panelSystem = raw.panelSystem;
   if (raw.judgeSystem) preset.judgeSystem = raw.judgeSystem;
   if (raw.writerSystem) preset.writerSystem = raw.writerSystem;
+  // v0.9 §22 fields; value validation happens at normalize time.
+  if (raw.writerStrategy) preset.writerStrategy = raw.writerStrategy as ResolvedPreset["writerStrategy"];
+  if (raw.topology) preset.topology = raw.topology as ResolvedPreset["topology"];
+  if (raw.route !== undefined) preset.route = raw.route;
   return preset;
 }
 

@@ -18,6 +18,18 @@ export interface ParsedCliArgs {
   showAnalysis: boolean;
   log?: string;
   maxCost?: number;
+  /** v0.9 §22.1: restrict the panel to these providers. */
+  onlyProviders?: string[];
+  /** v0.9 §22.1: drop these providers from the panel. */
+  excludeProviders?: string[];
+  /** v0.9 §22.2: "fixed" | "top-ranked" | "capability". */
+  writerStrategy?: string;
+  /** v0.9 §22.4: route to a single best-fit model. */
+  route: boolean;
+  /** v0.9 §22.5: "standard" | "debate". */
+  topology?: string;
+  /** v0.9 §22.3: operating point — "fast" | "deliberate". */
+  mode?: string;
   version: boolean;
   help: boolean;
 }
@@ -47,6 +59,12 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       "show-analysis": { type: "boolean", default: false },
       log: { type: "string" },
       "max-cost": { type: "string" },
+      "only-provider": { type: "string" },
+      "exclude-provider": { type: "string" },
+      "writer-strategy": { type: "string" },
+      route: { type: "boolean", default: false },
+      topology: { type: "string" },
+      mode: { type: "string" },
       version: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
@@ -57,6 +75,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     local: Boolean(values.local),
     stream: Boolean(values.stream),
     showAnalysis: Boolean(values["show-analysis"]),
+    route: Boolean(values.route),
     version: Boolean(values.version),
     help: Boolean(values.help),
   };
@@ -83,6 +102,11 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     }
     args.maxCost = n;
   }
+  if (values["only-provider"]) args.onlyProviders = splitCsv(values["only-provider"]);
+  if (values["exclude-provider"]) args.excludeProviders = splitCsv(values["exclude-provider"]);
+  if (values["writer-strategy"]) args.writerStrategy = values["writer-strategy"];
+  if (values.topology) args.topology = values.topology;
+  if (values.mode) args.mode = values.mode;
 
   return args;
 }

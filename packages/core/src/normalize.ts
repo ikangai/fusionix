@@ -7,8 +7,9 @@
  * → validate.
  */
 import { FusionixError } from "./errors.ts";
-import { foldRoles, hasUserMessage } from "./messages.ts";
+import { foldRoles, hasUserMessage, renderCompactPrompt } from "./messages.ts";
 import { defaultRandomId } from "./util.ts";
+import { providerOf, detectCategory, pickBestModel } from "./capabilities.ts";
 import type {
   ExecutionPlan,
   FusionixChatCompletionRequest,
@@ -16,6 +17,23 @@ import type {
   FusionixPlugin,
   ResolvedPreset,
 } from "./types.ts";
+
+const WRITER_STRATEGIES = new Set(["fixed", "top-ranked", "capability"]);
+const TOPOLOGIES = new Set(["standard", "debate"]);
+
+/**
+ * Apply provider include/exclude filters to a resolved panel (v0.9 §22.1). `only`
+ * (when non-empty) keeps only those providers; `exclude` then drops providers.
+ * Empty filters are no-ops. Pure.
+ */
+function filterPanelByProvider(panel: string[], only?: string[], exclude?: string[]): string[] {
+  let out = panel;
+  const onlySet = new Set((only ?? []).map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0));
+  if (onlySet.size > 0) out = out.filter((m) => onlySet.has(providerOf(m).toLowerCase()));
+  const exclSet = new Set((exclude ?? []).map((p) => p.trim().toLowerCase()).filter((p) => p.length > 0));
+  if (exclSet.size > 0) out = out.filter((m) => !exclSet.has(providerOf(m).toLowerCase()));
+  return out;
+}
 
 export interface NormalizeOptions {
   runId?: string;
@@ -83,19 +101,55 @@ export function normalizeRequest(
   }
 
   // Resolve stages.
-  const panel = plugin?.analysis_models ?? preset?.panel ?? [];
+  const rawPanel = plugin?.analysis_models ?? preset?.panel ?? [];
+  const panel = filterPanelByProvider(rawPanel, plugin?.only_providers, plugin?.exclude_providers);
   const judge = plugin?.model ?? preset?.judge ?? "";
-  const writer = isFusionixModel ? (preset?.writer ?? "") : request.model;
-  const bypass = plugin?.enabled === false;
+  let writer = isFusionixModel ? (preset?.writer ?? "") : request.model;
+  let bypass = plugin?.enabled === false;
   const web = opts.webOverride ?? preset?.web ?? config.defaults.web;
   const maxToolCalls = plugin?.max_tool_calls ?? config.defaults.maxToolCalls;
+
+  // v0.9 extensions (§22): writer strategy and panel topology.
+  const writerStrategy = plugin?.writer_strategy ?? preset?.writerStrategy;
+  if (writerStrategy !== undefined && !WRITER_STRATEGIES.has(writerStrategy)) {
+    throw new FusionixError("invalid_request", `Unknown writer_strategy: ${writerStrategy}`);
+  }
+  const topology = plugin?.topology ?? preset?.topology;
+  if (topology !== undefined && !TOPOLOGIES.has(topology)) {
+    throw new FusionixError("invalid_request", `Unknown topology: ${topology}`);
+  }
+
+  // Single-model routing (§22.4): fusionix picks the best-fit model from the pool and
+  // runs it as a single-model call (bypass mechanics). Resolved here so behavior stays
+  // deterministic before any gateway call (§6.8). An explicit `enabled:false` bypass wins.
+  const routing = (plugin?.route === true || preset?.route === true) && !bypass;
+  let routeCategory: string | undefined;
+  if (routing) {
+    if (panel.length === 0) {
+      throw new FusionixError("invalid_request", "Routing requires a non-empty panel/pool to choose from.");
+    }
+    const category = detectCategory(renderCompactPrompt(request.messages));
+    const routed = pickBestModel(panel, category);
+    if (routed) {
+      writer = routed;
+      bypass = true;
+      routeCategory = category;
+    }
+  }
 
   // Model presence (§6.8 step 6). Writer always; panel/judge only when deliberating.
   if (!writer) {
     throw new FusionixError("invalid_request", "No writer model resolved.");
   }
   if (!bypass) {
-    if (panel.length === 0) throw new FusionixError("invalid_request", "Resolved panel is empty.");
+    if (panel.length === 0) {
+      throw new FusionixError(
+        "invalid_request",
+        rawPanel.length > 0
+          ? "Resolved panel is empty after provider filtering."
+          : "Resolved panel is empty.",
+      );
+    }
     if (!judge) throw new FusionixError("invalid_request", "No judge model resolved.");
   }
 
@@ -126,6 +180,13 @@ export function normalizeRequest(
   if (preset?.judgeSystem) plan.judgeSystem = preset.judgeSystem;
   if (preset?.writerSystem) plan.writerSystem = preset.writerSystem;
   if (preset?.name) plan.presetName = preset.name;
+  if (writerStrategy !== undefined && writerStrategy !== "fixed") {
+    plan.writerStrategy = writerStrategy as ExecutionPlan["writerStrategy"];
+  }
+  if (topology !== undefined && topology !== "standard") {
+    plan.topology = topology as ExecutionPlan["topology"];
+  }
+  if (routeCategory !== undefined) plan.routeCategory = routeCategory;
 
   return plan;
 }

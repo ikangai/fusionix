@@ -42,6 +42,10 @@ export interface FusionixExtrasWire {
   web: WebStatus;
   /** Omitted in single-model bypass (§6.7). */
   max_tool_calls_enforced?: boolean;
+  /** Present only when the run was routed to a single best-fit model (v0.9 §22.4). */
+  route_category?: string;
+  /** The model auto-selected by routing; present only for routed runs (v0.9 §22.4). */
+  model_used?: string;
 }
 
 export interface ChatCompletionResponse {
@@ -92,6 +96,11 @@ export function toChatCompletion(result: FusionixRunResult): ChatCompletionRespo
       };
   if (result.panel) fusionix.panel = toWirePanel(result.panel);
   if (result.analysis) fusionix.analysis = toWireAnalysis(result.analysis);
+  // Routed runs (§22.4) surface the auto-selected model and the detected category.
+  if (result.routeCategory !== undefined) {
+    fusionix.route_category = result.routeCategory;
+    fusionix.model_used = result.model;
+  }
 
   return {
     id: result.runId,
