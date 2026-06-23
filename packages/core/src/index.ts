@@ -14,6 +14,15 @@ export type { LoadConfigOptions } from "./config.ts";
 export { normalizeRequest } from "./normalize.ts";
 export type { NormalizeOptions } from "./normalize.ts";
 
+export {
+  providerOf,
+  capabilitiesFor,
+  scoreModelForCategory,
+  pickBestModel,
+  detectCategory,
+} from "./capabilities.ts";
+export type { Capability } from "./capabilities.ts";
+
 export { aggregateUsage, estimateCost } from "./cost.ts";
 export type { AggregatedUsage, CostEstimate, EstimateOptions, PriceEntry } from "./cost.ts";
 
