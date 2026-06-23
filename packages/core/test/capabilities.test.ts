@@ -28,6 +28,14 @@ test("capabilitiesFor maps GPT→math-first and Gemini→science-first (§22 Fug
   assert.equal(capabilitiesFor("google/gemini-3.1-pro-preview")[0], "science");
 });
 
+test("v0.10: priors reconciled with TRINITY winners — Gemini gains math, Claude gains recall", () => {
+  // TRINITY Table 1: Gemini-2.5-pro tops MATH500; Claude tops MMLU (recall).
+  assert.ok(capabilitiesFor("google/gemini-3.1-pro-preview").includes("math"), "Gemini is a math contender");
+  assert.ok(capabilitiesFor("anthropic/claude-haiku-4.5").includes("recall"), "Claude handles recall");
+  // But GPT still wins a pure math route (math at index 0 beats Gemini's later position).
+  assert.equal(pickBestModel(["google/gemini-3.1-pro-preview", "openai/gpt-5.2"], "math"), "openai/gpt-5.2");
+});
+
 test("capabilitiesFor falls back to general for unknown slugs", () => {
   assert.deepEqual(capabilitiesFor("mistral/mixtral"), ["general"]);
 });

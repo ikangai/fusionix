@@ -33,16 +33,21 @@ interface FamilyPrior {
   strengths: Capability[];
 }
 
+// Priors reconcile the Sakana Fugu report with the TRINITY paper's *measured* per-task
+// winners (TRINITY Table 1, Fig. 7: GPT tops LiveCodeBench; Gemini-2.5-pro tops MATH500 and
+// science/GPQA; Claude tops MMLU). They aim to encode COMPARATIVE ADVANTAGE, not global
+// strength (TRINITY §A.6, the RER objective): a model should own the categories where it is
+// *uniquely* best, so a model that is second-best everywhere is rarely the routed pick.
 // Longest match wins, so "anthropic/claude-opus" beats the generic "anthropic/claude".
 const FAMILY_PRIORS: readonly FamilyPrior[] = [
-  // OpenAI GPT — mathematics, planning, competitive coding (Fugu §4.1.3, §4.2).
+  // OpenAI GPT — mathematics and competitive coding (Fugu §4.1.3; TRINITY: GPT tops LiveCodeBench).
   { match: "openai/gpt", strengths: ["math", "reasoning", "coding", "general"] },
   // Anthropic Opus — software engineering, debugging, cybersecurity (Fugu §4.4 build-and-debug / specialist).
   { match: "anthropic/claude-opus", strengths: ["coding", "debugging", "cybersecurity", "reasoning"] },
-  // Other Claude families — general coding/reasoning.
-  { match: "anthropic/claude", strengths: ["coding", "debugging", "reasoning", "general"] },
-  // Google Gemini — science and factual recall (Fugu §4.2: chemistry/biology routed to Gemini).
-  { match: "google/gemini", strengths: ["science", "recall", "reasoning", "general"] },
+  // Other Claude families — coding/reasoning, plus factual recall (TRINITY: Claude tops MMLU).
+  { match: "anthropic/claude", strengths: ["coding", "debugging", "reasoning", "recall", "general"] },
+  // Google Gemini — science, mathematics, factual recall (Fugu §4.2; TRINITY: Gemini tops MATH500 + GPQA).
+  { match: "google/gemini", strengths: ["science", "math", "recall", "reasoning", "general"] },
 ];
 
 /** The provider prefix of a gateway slug (`anthropic/claude-opus-4.8` → `anthropic`). */
