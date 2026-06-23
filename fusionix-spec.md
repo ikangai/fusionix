@@ -1,7 +1,7 @@
 # Fusionix — OpenRouter-Shaped Multi-Model Deliberation Engine
 
 **Implementation specification for Claude Code**
-Status: v0.9 — Phase 1 + Fugu-inspired extensions (§22). (v0.8 was "FROZEN, Phase 1 only"; v0.9 adds opt-in, off-by-default deliberation controls inspired by the Sakana Fugu report and supersedes the corresponding §19 non-goals.)
+Status: v0.10 — Phase 1 + Fugu/Trinity/Conductor extensions (§22, §23). (v0.8 was "FROZEN, Phase 1 only"; v0.9 added opt-in deliberation controls from the Sakana Fugu report (§22); v0.10 adds further opt-in coordination controls from the TRINITY and Conductor papers (§23). All extensions are off by default at the pipeline level.)
 Owner: IKANGAI
 Product domain: fusionix.ikangai.com
 API base: https://fusionix.ikangai.com/api
@@ -32,7 +32,7 @@ user request
 2. **Judge** — compare the panel answers; return structured JSON: consensus, contradictions, partial coverage, unique insights, blind spots, optional ranking.
 3. **Writer** — produce the final user-facing answer from the original prompt and the judge analysis.
 
-This is the core product and the default behavior. v0.9 adds **opt-in, off-by-default** controls on top of this same pipeline — provider pool filtering, an adaptive (per-query) writer/aggregator, single-model routing, and an optional debate round — all specified in §22. With no v0.9 options set, behavior is exactly the pipeline above.
+This is the core product and the default behavior. v0.9 (§22) and v0.10 (§23) add **opt-in, off-by-default** controls on top of this same pipeline — provider pool filtering, an adaptive (per-query) writer/aggregator, single-model routing, an optional debate round, a verifier accept-gate, a configurable writer access-list, and a sequential chain topology. With no extension options set, behavior is exactly the pipeline above.
 
 ---
 
@@ -907,7 +907,35 @@ It always falls back to the configured writer when nothing resolves. `result.mod
 
 ### 22.7 Deferred / not applicable
 
-- **Access-list memory & intra-workflow isolation** (Fugu §3.2.2): meaningful only with tool-use / multi-turn function calling, which fusionix v0.9 does not have. Deferred; see the design note.
+- **Access-list memory & intra-workflow isolation** (Fugu §3.2.2): the *static, within-pipeline* access list is now implemented in v0.10 as the writer access-list (§23.3) — Conductor showed it is pure prompt-string selection, not a tool-use mechanism. What remains deferred is the *dynamic, per-query, arbitrary-graph* access list (a workflow DSL).
 - **Learned orchestration** (Fugu's SFT / sep-CMA-ES / GRPO): out of scope — fusionix is deterministic and zero-ML. The transferable crumb is the §22.6 capability prior.
 
 Everything else follows the phase plan (§18).
+
+---
+
+## 23. TRINITY / Conductor extensions (v0.10)
+
+A second wave of opt-in, deterministic controls inspired by the two papers the Fugu report builds on: **TRINITY** (Xu et al., *An Evolved LLM Coordinator*) and **Conductor** (Nielsen et al., *Learning to Orchestrate Agents in Natural Language*). As with §22, both papers' *trained* cores (evolution / RL) are out of scope for a zero-ML gateway; v0.10 adopts only their *structural* ideas. The §22 invariants apply: off by default at the pipeline level (QA group O), deterministic and resolved pre-call (§6.8), settable from preset or request. See `docs/design/fugu-extensions.md`.
+
+### 23.1 Verifier accept-gate
+
+`plugins[0].accept_on_consensus` (CLI `--accept-on-consensus`): TRINITY (§3.2) halts coordination when a Verifier returns ACCEPT. fusionix derives that signal deterministically from the judge output — when the judge reports **no contradictions AND no blind spots**, accept the strongest surviving panelist's answer (the judge's #1 ranked survivor, else the first) and **skip the writer synthesis**, saving one model call. The run reports `accepted_on_consensus` in the JSON extras and a footer marker; `result.model` is the accepted panelist. Off by default → the writer always runs.
+
+### 23.2 Capability prior reconciled with measured winners
+
+The §22.6 capability prior (`capabilities.ts`) is reconciled with TRINITY's *measured* per-task winners (TRINITY Table 1: Gemini-2.5-pro tops MATH500 + GPQA, Claude tops MMLU): Gemini gains `math`, Claude gains `recall`. The guiding principle (TRINITY §A.6, the RER objective) is **comparative advantage, not global strength** — a model owns the categories where it is *uniquely* best. Existing routes are unchanged (math still → GPT); the additions are better-placed fallbacks.
+
+### 23.3 Writer access-list
+
+`plugins[0].writer_access` (CLI `--writer-access`): `judge` (default) | `judge+panel` | `judge+top`. Conductor's per-step `access_list` is pure prompt-context selection (no tools). fusionix's writer saw only the judge analysis (a hardcoded one-element access list); this makes it configurable — `judge+panel` also grants the raw surviving panel answers, `judge+top` the top-ranked survivor's answer — for tasks where the judge's summary loses signal the synthesizer needs. Default is unchanged (analysis only).
+
+### 23.4 Chain topology
+
+`plugins[0].topology: "chain"` (CLI `--topology chain`): a sequential **planner → builder(s) → finalizer** pipeline. The panel models run in order, each seeing the accumulated work of the prior steps; the last step that produces content is the final answer. This is the asymmetric staged hand-off Conductor's data (§F.1, Fig. 8) shows wins on hard multi-step tasks — distinct from the parallel panel and the symmetric §22.5 debate round. There is **no judge or writer stage** in chain mode (so chain needs no judge model); chain steps may use web like the panel, and a failed/empty step is kept in place while the chain continues.
+
+### 23.5 Deferred / not applicable (TRINITY / Conductor)
+
+- **Multi-turn bounded coordination loop** and a **static workflow DSL** (config-authored `steps[]` with per-step access lists — Conductor's full artifact minus the learning): the coherent next direction, still zero-ML, but a substantial new subsystem. Roadmap.
+- **Dynamic per-query role selection** (TRINITY's Thinker/Worker/Verifier logit): training-bound, and TRINITY's own ablation shows it can *hurt* some task types — fusionix's *fixed* role contracts (panel/judge/writer + the §23.1 verifier gate) are the sound deterministic analogue. Out of scope.
+- **The learned coordinators themselves** (TRINITY's SLM head + sep-CMA-ES; Conductor's 7B + GRPO): out of scope — no training loop. Their transferable crumbs are realized as the §23.2 prior reconciliation and the §22.6 / §23.x structural controls.

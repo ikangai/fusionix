@@ -74,21 +74,25 @@ Key options (`fusionix --help` for the full list):
 | `--log <path>` | Write a JSON run record. |
 | `--max-cost <usd>` | Warn/abort before the run when the estimate exceeds this (best-effort). |
 
-### Deliberation controls (v0.9, opt-in)
+### Deliberation controls (v0.9 / v0.10, opt-in)
 
-Inspired by the Sakana Fugu report; all **off by default** (see `fusionix-spec.md` §22 and `docs/design/fugu-extensions.md`):
+Inspired by the Sakana Fugu, TRINITY, and Conductor papers; all **off by default** (see `fusionix-spec.md` §22–§23 and `docs/design/fugu-extensions.md`):
 
 | Option | Meaning |
 |---|---|
 | `--only-provider <a,b>` / `--exclude-provider <a>` | Filter the panel by provider (`anthropic`, `openai`, `google`, …). |
 | `--writer-strategy <fixed\|top-ranked\|capability>` | Pick the writer per query — the judge's #1 model, or the per-category specialist — instead of always the configured writer. |
 | `--route` / `--mode fast` | Skip deliberation: route the query to a single best-fit model. |
-| `--topology <standard\|debate>` | `debate` adds one round where panelists revise after seeing each other's answers. |
+| `--topology <standard\|debate\|chain>` | `debate` = one round where panelists revise after seeing each other; `chain` = sequential planner→builder→finalizer (no judge/writer). |
+| `--accept-on-consensus` | When the judge finds no disagreement, accept the top panelist and skip the writer (one fewer call). |
+| `--writer-access <judge\|judge+panel\|judge+top>` | What the writer sees beyond the judge analysis — also the raw panel answers, or the top panelist's. |
 
 ```bash
 fusionix "Prove this number-theory lemma" --local --writer-strategy capability   # GPT writes
 fusionix "What's the capital of Australia?" --local --route                       # one model, no panel
 fusionix "Design a rate limiter" --local --topology debate --show-analysis        # panelists revise, then judge
+fusionix "Refactor this module step by step" --local --topology chain             # plan → build → finalize
+fusionix "Define idempotency" --local --accept-on-consensus                        # skip the writer if the panel agrees
 ```
 
 ### Latency

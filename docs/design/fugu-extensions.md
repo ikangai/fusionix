@@ -72,16 +72,15 @@ bytes are pinned by the unit tests instead.
 - **Debate is monotonic on the panel**: a failed or empty revision keeps the round-1
   answer, so a debate round can only improve or preserve the panel.
 
-## Deferred (intentionally not built)
+## Deferred in v0.9 — partly resolved in v0.10
 
-- **Persistent shared memory + intra-workflow access-list isolation** (Fugu §3.2.2). Fugu
-  isolates each agent's function-call trajectory and shares memory across multi-turn
-  workflows via an *access list* (each subtask declares which prior outputs it sees). This
-  is meaningful only with tool-use / multi-turn function calling, which fusionix v0.9 does
-  not have (single-turn, no tools). The access-list concept is a cleaner context-flow
-  primitive than the current hardcoded "judge sees all answers, writer sees judge JSON" and
-  is the natural design if/when fusionix grows tools — but building it now would be
-  speculative scaffolding with no substrate to attach to.
+- **Persistent shared memory + intra-workflow access-list isolation** (Fugu §3.2.2). v0.9
+  deferred this as "needs tool-use/multi-turn." **The Conductor paper showed that assumption
+  was wrong**: its `access_list` is pure prompt-string selection (which prior step's text is
+  concatenated into the next prompt), with no tool API. So the *static, within-pipeline*
+  access list was implemented in **v0.10 as the writer access-list (§23.3)** — see the v0.10
+  section below. What remains deferred is the *dynamic, per-query, arbitrary-graph* access
+  list, which needs a workflow DSL (and whose *learned* selection would need training).
 
 ## Not applicable (and why)
 
@@ -102,3 +101,61 @@ measurements, and model slugs drift (cf. `config/default.config.json`). They are
 data, like the preset model lists (§4) — revisit them as the model lineup changes. The
 routing classifier is a keyword scan; it is deliberately simple and will mis-categorize
 unusual phrasings (it falls back to `general`, which keeps the configured/first-fit model).
+
+---
+
+# v0.10 — TRINITY + Conductor extensions (§23)
+
+## Sources
+
+- **TRINITY** (Xu et al., *An Evolved LLM Coordinator*) — what Fugu builds on. A tiny learned
+  coordinator (<20K params) picks, per query, *which model* and *which role* (Thinker / Worker /
+  **Verifier**) over ≤5 cyclical turns, **halting when a Verifier returns ACCEPT**. Trained by
+  evolution (sep-CMA-ES) on a binary terminal reward.
+- **Conductor** (Nielsen et al., *Learning to Orchestrate Agents in Natural Language*) — what
+  Fugu-Ultra builds on. A 7B RL-trained model emits a whole workflow as parallel lists
+  `(model_id, subtask, access_list)`, where `access_list` selects which prior steps' text each
+  worker sees. Trained by GRPO on outcome reward.
+
+Both papers' trained cores are out of scope (no training loop). v0.10 adopts only their
+deterministic, structural ideas, each opt-in.
+
+## What was implemented (v0.10)
+
+| Idea | fusionix feature | Flag(s) | Spec | Commit |
+|---|---|---|---|---|
+| TRINITY measured per-task winners | Capability prior reconciliation | — | §23.2 | `eae5c08` |
+| TRINITY Verifier-as-halt (§3.2) | Verifier accept-gate (skip writer on consensus) | `--accept-on-consensus` | §23.1 | `15a47d5` |
+| Conductor `access_list` (tools-free) | Configurable writer access-list | `--writer-access` | §23.3 | `7b0b2ef` |
+| Conductor sequential chain (§F.1) | `chain` topology (planner→builder→finalizer) | `--topology chain` | §23.4 | `e2d6941` |
+
+The §22 invariant holds: with no v0.10 flag, the pipeline is exactly §1 (QA guard `O7`). All
+selection is deterministic and resolved pre-call; the accept-gate is a pure predicate on the
+judge JSON.
+
+### Design choices worth recording
+
+- **Accept-gate fires only on FULL consensus** (no contradictions *and* no blind spots). It is
+  the deterministic analogue of TRINITY's Verifier ACCEPT — except fusionix *computes* the
+  predicate from the judge's structured output rather than learning it. The accepted answer is a
+  raw panel answer (no synthesis), which is the explicit cost/quality trade the flag opts into.
+- **The capability reconciliation is additive**, so existing routes are byte-stable: GPT keeps
+  `math` at index 0 (pure-math still routes to GPT), and Gemini/Claude just gain better-placed
+  fallbacks. The two papers *disagree* on math (Fugu: GPT; TRINITY: Gemini tops MATH500) — the
+  additive change records TRINITY's signal without overturning Fugu's.
+- **Chain is a self-contained path** (like bypass), not a wrapper around panel→judge→writer:
+  no judge, no writer, final answer = last step. This keeps it cheap and faithful to Conductor's
+  planner→executor→checker, and is why normalize relaxes the judge-required rule for chain.
+- **The writer access-list reuses positional rendering** (`renderAnswers`), consistent with the
+  existing `[n]`/model-id machinery, so `judge+top` resolves the same way `top-ranked` does.
+
+## Deferred / not applicable (TRINITY / Conductor)
+
+- **Bounded multi-turn loop + static workflow DSL** (config-authored `steps[]` with per-step
+  access lists — Conductor's artifact minus the learning): the next coherent direction, still
+  zero-ML, but a substantial new subsystem (parser, validator, per-step cost accounting). Roadmap.
+- **Dynamic per-query role selection** (TRINITY's role logit): training-bound; TRINITY's own
+  ablation shows dynamic roles can *hurt* recall tasks while model-selection matters far more, so
+  fusionix's fixed role-contracts + the §23.1 verifier gate are the sound deterministic analogue.
+- **The learned coordinators** (TRINITY's SLM head + sep-CMA-ES; Conductor's 7B + GRPO): no
+  training loop. The transferable crumbs are realized as §23.2 (prior) and the structural controls.
