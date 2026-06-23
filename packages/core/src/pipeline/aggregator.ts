@@ -16,6 +16,7 @@
  * model, so a vague judge ranking or a category-less prompt never breaks the run.
  */
 import { pickBestModel, detectCategory } from "../capabilities.ts";
+import { userTurnsText } from "../messages.ts";
 import type { ExecutionPlan, FusionixAnalysis } from "../types.ts";
 
 /**
@@ -49,14 +50,11 @@ export function resolveRankedModel(entry: string, survivors: string[]): string |
 /**
  * Choose the writer model for this run. Returns `plan.writer` for the default
  * "fixed" strategy (or when nothing resolves), otherwise an adaptively-selected
- * surviving panel model. `prompt` is the rendered user request (for "capability").
+ * surviving panel model. The "capability" branch classifies the user's question
+ * only (via userTurnsText), matching the router (§22.4), so fixed persona/system
+ * text never drives writer selection.
  */
-export function chooseWriter(
-  plan: ExecutionPlan,
-  analysis: FusionixAnalysis,
-  survivors: string[],
-  prompt: string,
-): string {
+export function chooseWriter(plan: ExecutionPlan, analysis: FusionixAnalysis, survivors: string[]): string {
   if (survivors.length === 0) return plan.writer;
 
   switch (plan.writerStrategy) {
@@ -68,7 +66,7 @@ export function chooseWriter(
       return plan.writer;
     }
     case "capability": {
-      const category = detectCategory(prompt);
+      const category = detectCategory(userTurnsText(plan.messages));
       // No category signal → keep the configured writer rather than guessing.
       if (category === "general") return plan.writer;
       return pickBestModel(survivors, category) ?? plan.writer;

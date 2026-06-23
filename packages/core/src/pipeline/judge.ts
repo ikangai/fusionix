@@ -8,7 +8,7 @@
  */
 import { FusionixError } from "../errors.ts";
 import { extractJson } from "../json.ts";
-import { JUDGE_SYSTEM, composeSystem, renderAnswers, renderJudgeUser } from "../prompts.ts";
+import { JUDGE_SYSTEM, JUDGE_RANKING_INSTRUCTION, composeSystem, renderAnswers, renderJudgeUser } from "../prompts.ts";
 import { makeChatRequest } from "../gateway/contract.ts";
 import type { ChatGateway, ChatRequest } from "../gateway/contract.ts";
 import type {
@@ -106,7 +106,11 @@ export async function runJudge(
   // Initial judge call. (Judge never uses web.)
   let firstContent: string;
   try {
-    const systemText = composeSystem(JUDGE_SYSTEM, plan.judgeSystem);
+    // The model-id ranking instruction is added only for the top-ranked writer strategy
+    // (§22.2); otherwise the judge prompt is exactly §14.2.
+    const judgeBase =
+      plan.writerStrategy === "top-ranked" ? `${JUDGE_SYSTEM}\n\n${JUDGE_RANKING_INSTRUCTION}` : JUDGE_SYSTEM;
+    const systemText = composeSystem(judgeBase, plan.judgeSystem);
     const user = renderJudgeUser(prompt, renderAnswers(panel));
     const res = await deps.gateway.chat(
       baseReq([

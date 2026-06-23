@@ -137,7 +137,7 @@ export async function runFusionix(
     // Adaptive aggregator (§22.2): optionally pick the writer from the surviving panel
     // models (judge ranking or capability prior). Defaults to plan.writer ("fixed").
     const survivors = panelForJudge.filter((r) => r.error === undefined && r.answer !== undefined).map((r) => r.model);
-    const chosenWriter = chooseWriter(plan, analysis, survivors, prompt);
+    const chosenWriter = chooseWriter(plan, analysis, survivors);
     const writerPlan = chosenWriter === plan.writer ? plan : { ...plan, writer: chosenWriter };
 
     opts.onProgress?.("writer");

@@ -62,6 +62,17 @@ test("an empty revision keeps the round-1 answer (never loses a survivor)", asyn
   assert.equal(out.responses[1]?.answer, "b1", "empty revision keeps round-1");
 });
 
+test("a panel that repeats a model id keeps each position's distinct revision (no collapse)", async () => {
+  // Duplicate model ids are a legal panel config; positional mapping must not collapse them.
+  const responses: PanelResponse[] = [{ model: "A", answer: "a1" }, { model: "A", answer: "a2" }];
+  let n = 0;
+  const { gateway, calls } = gw(() => ({ content: JSON.stringify({ answer: `rev-A-${(n += 1)}` }) }));
+  const out = await runDebate(plan(), "q", responses, { gateway });
+  assert.equal(calls.length, 2, "one revision call per survivor position");
+  assert.equal(out.responses.length, 2);
+  assert.notEqual(out.responses[0]?.answer, out.responses[1]?.answer, "the two positions keep distinct revisions");
+});
+
 test("failed panel members stay in place and order is preserved", async () => {
   const responses: PanelResponse[] = [
     { model: "A", answer: "a1" },

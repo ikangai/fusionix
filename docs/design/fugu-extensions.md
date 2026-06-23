@@ -31,30 +31,44 @@ non-goals.
 | Latency-aware single-worker variant | Single-model routing | `--route`, `--mode fast` | §22.4 | `d9469cb` |
 | Two operating points (Fugu vs Fugu-Ultra) | Mode sugar | `--mode fast\|deliberate` | §22.3 | `d9469cb` |
 | Per-query aggregator (§4.4) | Adaptive writer selection | `--writer-strategy top-ranked\|capability` | §22.2 | `2db2545` |
-| Aggregator *resolves* contradictions (§4.4) | Stronger writer prompt | (always on) | §22.2 | `2db2545` |
+| Aggregator *resolves* contradictions (§4.4) | Stronger writer prompt | always-on default change | §22.2 | `2db2545` |
 | Debate & aggregation topologies (§4.4) | Debate revision round | `--topology debate` | §22.5 | `a20cab5` |
 | "beyond any individual agent" (§4) | A/B eval harness | `node qa/ab-eval.mjs` | — | `c507401` |
 
-**Hard invariant across all of them:** off by default. With no v0.9 flag, the pipeline
-is byte-for-byte §1 behavior (QA regression guard `M8`, plus the unchanged 78 baseline
-cases). Everything is resolved deterministically in `normalizeRequest` before any
-gateway call (§6.8), except the adaptive writer, which is a pure function of the judge
-analysis at the judge→writer seam.
+**Hard invariant:** off by default *at the pipeline level*. With no v0.9 flag set, the
+pipeline shape, models, and routing are exactly §1 — no new stage, no model swap, no
+routing — and that is the regression-guarded property (QA case `N8` checks the default
+run is a 3-model deliberation with round-1 panel answers and no routing, plus the
+unchanged 78 baseline cases). Everything new is resolved deterministically in
+`normalizeRequest` before any gateway call (§6.8), except the adaptive writer, which is
+a pure function of the judge analysis at the judge→writer seam.
+
+**Two deliberate exceptions to "exactly §1" on the prompt text** (not pipeline shape):
+the **writer prompt** (§14.3) is strengthened to *resolve* disagreements on every run as
+a v0.9 product decision — so a default run's writer instruction differs from v0.8 (this
+is intended, and `prompts.test.ts` pins the exact strings to catch unintended drift). The
+**judge prompt** is unchanged on the default path; the model-id ranking instruction is
+appended **only** when `writer_strategy: top-ranked` (it is a prerequisite of that
+strategy, not a global change). `N8` guards pipeline shape, not prompt bytes — the prompt
+bytes are pinned by the unit tests instead.
 
 ### Design choices worth recording
 
-- **Judge ranking had to be pinned to model-ids.** The judge's `ranking` was free-form
-  text and answers were labelled with *both* an index and a model-id, so `ranking[0]`
-  could not be mapped to a model. `top-ranked` therefore required a one-line `JUDGE_SYSTEM`
-  change (rank by model-id) plus `resolveRankedModel` (slug / `[n]` index / family
-  substring → surviving model). A bare numeric token is treated strictly as an index, never
-  a substring, so `"4"` does not spuriously match the `4` in `claude-opus-4.8`.
+- **Judge ranking had to be pinned to model-ids — but only for `top-ranked`.** The judge's
+  `ranking` was free-form text and answers were labelled with *both* an index and a model-id,
+  so `ranking[0]` could not be mapped to a model. `top-ranked` therefore appends a
+  `JUDGE_RANKING_INSTRUCTION` (rank by model-id) **only when that strategy is active**, so the
+  default judge prompt stays byte-for-byte §14.2; plus `resolveRankedModel` (slug / `[n]`
+  index / family substring → surviving model). A bare numeric token is treated strictly as an
+  index, never a substring, so `"4"` does not spuriously match the `4` in `claude-opus-4.8`.
 - **Routing reuses the bypass path** rather than adding a parallel execution path: it sets
   `bypass = true` and `writer = <routed model>` in normalization. It only applies to the
   `fusionix` meta-model so an explicitly named model is never silently swapped (code review
   finding M1).
-- **Category detection reads the user turn only**, not the system/persona prompt, which is
-  usually fixed across turns and would otherwise pin every query to one category (M2).
+- **Category detection reads the user turn only**, via the shared `userTurnsText` helper —
+  not the system/persona prompt or prior assistant turns, which are usually fixed and would
+  otherwise pin a query to one category. *Both* consumers use it: the router (M2) and the
+  `capability` writer-strategy (final-review finding — they must agree on the input).
 - **Debate is monotonic on the panel**: a failed or empty revision keeps the round-1
   answer, so a debate round can only improve or preserve the panel.
 

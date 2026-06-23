@@ -61,6 +61,22 @@ function writerModelOf(calls: ChatRequest[]): string | undefined {
   return calls.find((c) => stageOf(c) === "writer")?.model;
 }
 
+function judgeSystemOf(calls: ChatRequest[]): string {
+  const j = calls.find((c) => stageOf(c) === "judge");
+  const sys = j?.messages.find((m) => m.role === "system");
+  return typeof sys?.content === "string" ? sys.content : "";
+}
+
+test("top-ranked adds the model-id ranking instruction to the judge prompt; default does not (§22.2)", async () => {
+  const a = gatewayWith([GEMINI]);
+  await runFusionix(fx({ writer_strategy: "top-ranked" }), { config: config(), gateway: a.gateway, apiKey: "x" });
+  assert.match(judgeSystemOf(a.calls), /model-id/, "top-ranked judge prompt is augmented");
+
+  const b = gatewayWith([GEMINI]);
+  await runFusionix(fx({}), { config: config(), gateway: b.gateway, apiKey: "x" });
+  assert.doesNotMatch(judgeSystemOf(b.calls), /model-id/, "default judge prompt is the pristine §14.2 text");
+});
+
 test("writer-strategy 'fixed' (default) uses the configured writer despite the ranking", async () => {
   const { gateway, calls } = gatewayWith([GEMINI, OPUS, GPT]);
   const r = await runFusionix(fx({}), { config: config(), gateway, apiKey: "x" });

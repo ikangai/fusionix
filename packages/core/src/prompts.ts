@@ -15,10 +15,15 @@ Return JSON:
 
 export const JUDGE_SYSTEM = `You compare several model answers to the same user question.
 Do not write the final answer. Compare the answers.
-Each answer is labelled "[n] <model-id>". In "ranking", list the <model-id> values
-(the identifier after the bracketed number, e.g. "openai/gpt-5.2"), best answer first.
 Return JSON:
 { "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }`;
+
+/**
+ * Appended to the judge prompt ONLY for the `top-ranked` writer strategy (§22.2), so the
+ * default judge prompt (§14.2) is unchanged byte-for-byte. It pins `ranking` to model-ids
+ * so the aggregator can map the judge's #1 back to a surviving panel model.
+ */
+export const JUDGE_RANKING_INSTRUCTION = `Each answer is labelled "[n] <model-id>". In "ranking", list the <model-id> values (the identifier after the bracketed number, e.g. "openai/gpt-5.2"), best answer first.`;
 
 export const DEBATE_SYSTEM = `You are revising your earlier answer after seeing other experts' independent answers to the same question.
 Keep what is correct, adopt stronger points, and fix mistakes — but do not defer blindly; change your answer only where the others are more correct.

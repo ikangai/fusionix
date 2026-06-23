@@ -748,7 +748,7 @@ Write the final answer to the user's question using the judge analysis.
 Rules:
 - Lead with the answer.
 - Use consensus as high-confidence material.
-- Mention important disagreements when relevant.
+- When the panel disagrees, resolve it: weigh the evidence, decide which side is correct, and state the resolution — do not merely report that a disagreement exists.
 - Preserve useful unique insights.
 - Do not mention the panel, judge, or internal process.
 User question:
@@ -756,6 +756,8 @@ User question:
 Judge analysis:
 {{analysis}}
 ```
+
+(v0.9: the disagreement rule was strengthened from "Mention important disagreements when relevant" to the resolve-and-decide wording above, on all runs — §22.2.)
 
 ---
 
@@ -871,7 +873,7 @@ Start here:
 These extensions are inspired by the **Sakana Fugu technical report** (Sakana AI, 2026), which studies learned orchestration of frontier models and — while benchmarking against OpenRouter Fusion — identifies the limitations of a *fixed* deliberation pipeline. fusionix is a deterministic, zero-ML gateway pipeline, so it cannot learn an orchestrator; instead it adopts the report's *structural* ideas as small, deterministic, **opt-in** controls. See `docs/design/fugu-extensions.md` for the full mapping and rationale.
 
 **Invariants for every extension below:**
-- **Off by default.** With no v0.9 option set, behavior is exactly §1. (Regression-guarded: QA case `M8`.)
+- **Off by default at the pipeline level.** With no v0.9 option set, the pipeline *shape*, models, and routing are exactly §1 — no new stage, no model swap, no routing. (Regression-guarded: QA case `N8`.) The one deliberate cross-cutting change is the writer prompt (§14.3), which is strengthened to *resolve* disagreements on every run as a v0.9 product decision (§22.2); the judge prompt is unchanged unless `writer_strategy` is `top-ranked`.
 - **Deterministic, resolved pre-call (§6.8).** All selection happens in normalization before any gateway call; nothing is decided from live model output except the adaptive writer, which is a pure function of the judge analysis.
 - **Resolvable from preset or request.** Each option may be set on a preset (§5.1) or per-request via the plugin / CLI flag.
 
@@ -881,11 +883,11 @@ These extensions are inspired by the **Sakana Fugu technical report** (Sakana AI
 
 ### 22.2 Adaptive aggregator (writer strategy)
 
-`plugins[0].writer_strategy` (CLI `--writer-strategy`): `fixed` (default — §14.3 unchanged) | `top-ranked` | `capability`. For a non-fixed strategy, the writer is chosen from the **surviving panel models** after the judge:
-- `top-ranked`: the judge's #1 ranked model. To make this reliable the judge prompt (§14.2) now instructs ranking by **model-id**, and `resolveRankedModel` maps a ranking entry (slug, `[n]` index, or family substring) back to a surviving model.
-- `capability`: the surviving panelist best-suited to the detected query category (§22.6).
+`plugins[0].writer_strategy` (CLI `--writer-strategy`): `fixed` (default) | `top-ranked` | `capability`. For a non-fixed strategy, the writer is chosen from the **surviving panel models** after the judge:
+- `top-ranked`: the judge's #1 ranked model. To make this reliable, **only for this strategy** the judge prompt is augmented with a model-id ranking instruction (`JUDGE_RANKING_INSTRUCTION`, appended to §14.2); `resolveRankedModel` then maps a ranking entry (slug, `[n]` index, or family substring) back to a surviving model. The default/`capability` judge prompt is unchanged.
+- `capability`: the surviving panelist best-suited to the detected query category (§22.6). The category is detected from the **user turn only** (like routing, §22.4).
 
-It always falls back to the configured writer when nothing resolves. `result.model` reports the model that actually wrote. The writer prompt (§14.3) is also strengthened to **resolve** disagreements, not merely report them. (Fugu §4.4: a fixed aggregator bottlenecks the system; Fugu-Ultra picks the aggregator per query.)
+It always falls back to the configured writer when nothing resolves. `result.model` reports the model that actually wrote. Separately and **always on** (all strategies, including the default): the writer prompt (§14.3) is strengthened to *resolve* disagreements rather than merely report them — a v0.9 product change to the default writer behavior. (Fugu §4.4: a fixed aggregator bottlenecks the system; Fugu-Ultra picks the aggregator per query.)
 
 ### 22.3 Operating points (`--mode`)
 

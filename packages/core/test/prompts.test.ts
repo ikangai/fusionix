@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   PANEL_SYSTEM,
   JUDGE_SYSTEM,
+  JUDGE_RANKING_INSTRUCTION,
   WRITER_SYSTEM,
   composeSystem,
   renderAnswers,
@@ -21,14 +22,35 @@ test("system prompts carry the §14 instructions and JSON shapes", () => {
   assert.match(WRITER_SYSTEM, /Do not mention the panel/);
 });
 
-test("v0.9: judge ranks by model-id and writer resolves disagreements (§22.2)", () => {
-  // Ranking must be keyed on the model identifier so the adaptive aggregator can map it.
-  assert.match(JUDGE_SYSTEM, /model-id/);
-  assert.match(JUDGE_SYSTEM, /ranking/);
+test("v0.9: the default JUDGE_SYSTEM is the pristine §14.2 prompt; model-id ranking is gated (§22.2)", () => {
+  // The default judge prompt is byte-for-byte the pre-v0.9 §14.2 text (pinned to catch drift).
+  assert.equal(
+    JUDGE_SYSTEM,
+    `You compare several model answers to the same user question.
+Do not write the final answer. Compare the answers.
+Return JSON:
+{ "consensus": [], "contradictions": [], "partial_coverage": [], "unique_insights": [], "blind_spots": [], "ranking": [] }`,
+  );
+  // The model-id ranking instruction lives in a SEPARATE constant, appended only for
+  // the top-ranked strategy (judge.ts) — it must NOT be in the default prompt.
+  assert.doesNotMatch(JUDGE_SYSTEM, /model-id/);
+  assert.match(JUDGE_RANKING_INSTRUCTION, /model-id/);
   // The QA harness routes by the JUDGE_SYSTEM prefix; keep the first line intact.
   assert.ok(JUDGE_SYSTEM.startsWith("You compare several model answers"), "JUDGE_MARK prefix preserved");
-  // Writer is instructed to resolve, not merely report, disagreements.
-  assert.match(WRITER_SYSTEM, /resolve it/);
+});
+
+test("v0.9: the writer prompt resolves disagreements for ALL runs (always-on §22.2)", () => {
+  // Pinned to catch drift: WRITER_SYSTEM is an intentional always-on v0.9 change.
+  assert.equal(
+    WRITER_SYSTEM,
+    `Write the final answer to the user's question using the judge analysis.
+Rules:
+- Lead with the answer.
+- Use consensus as high-confidence material.
+- When the panel disagrees, resolve it: weigh the evidence, decide which side is correct, and state the resolution — do not merely report that a disagreement exists.
+- Preserve useful unique insights.
+- Do not mention the panel, judge, or internal process.`,
+  );
   assert.ok(WRITER_SYSTEM.startsWith("Write the final answer"), "WRITER_MARK prefix preserved");
 });
 

@@ -17,6 +17,7 @@ function plan(over: Partial<ExecutionPlan> = {}): ExecutionPlan {
     ...over,
   };
 }
+const ask = (content: string): ExecutionPlan["messages"] => [{ role: "user", content }];
 
 // ---- resolveRankedModel --------------------------------------------------
 
@@ -41,32 +42,41 @@ test("resolveRankedModel falls back to a substring/family match, else undefined"
 // ---- chooseWriter --------------------------------------------------------
 
 test("chooseWriter 'fixed' (default) returns plan.writer untouched", () => {
-  assert.equal(chooseWriter(plan(), analysis([GEMINI, OPUS, GPT]), SURVIVORS, "q"), GPT);
+  assert.equal(chooseWriter(plan(), analysis([GEMINI, OPUS, GPT]), SURVIVORS), GPT);
 });
 
 test("chooseWriter 'top-ranked' returns the judge's #1 surviving model", () => {
-  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI, OPUS, GPT]), SURVIVORS, "q"), GEMINI);
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI, OPUS, GPT]), SURVIVORS), GEMINI);
 });
 
 test("chooseWriter 'top-ranked' skips unresolvable entries, then falls back to plan.writer", () => {
   // First entry unresolvable, second resolves to OPUS.
-  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", OPUS]), SURVIVORS, "q"), OPUS);
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", OPUS]), SURVIVORS), OPUS);
   // Nothing resolves → fall back to the configured writer.
-  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", "!!!"]), SURVIVORS, "q"), GPT);
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis(["???", "!!!"]), SURVIVORS), GPT);
 });
 
 test("chooseWriter 'capability' picks the best-fit survivor for the detected category", () => {
-  assert.equal(chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "Prove the theorem"), GPT);
+  assert.equal(chooseWriter(plan({ writerStrategy: "capability", messages: ask("Prove the theorem") }), analysis([]), SURVIVORS), GPT);
   assert.equal(
-    chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "Explain the chemistry of this enzyme"),
+    chooseWriter(plan({ writerStrategy: "capability", messages: ask("Explain the chemistry of this enzyme") }), analysis([]), SURVIVORS),
     GEMINI,
   );
 });
 
+test("chooseWriter 'capability' classifies the user turn only, ignoring system/persona text", () => {
+  // A 'debugging' keyword in a system persona must NOT override a science user question.
+  const messages: ExecutionPlan["messages"] = [
+    { role: "system", content: "You are a debugging assistant; fix the bug and read the stack trace." },
+    { role: "user", content: "Explain the chemistry of this enzyme" },
+  ];
+  assert.equal(chooseWriter(plan({ writerStrategy: "capability", messages }), analysis([]), SURVIVORS), GEMINI);
+});
+
 test("chooseWriter 'capability' keeps plan.writer for a category-less ('general') prompt", () => {
-  assert.equal(chooseWriter(plan({ writerStrategy: "capability" }), analysis([]), SURVIVORS, "tell me a story"), GPT);
+  assert.equal(chooseWriter(plan({ writerStrategy: "capability", messages: ask("tell me a story") }), analysis([]), SURVIVORS), GPT);
 });
 
 test("chooseWriter returns plan.writer when there are no survivors", () => {
-  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI]), [], "q"), GPT);
+  assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI]), []), GPT);
 });

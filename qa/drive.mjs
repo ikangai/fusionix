@@ -245,7 +245,9 @@ test({ id: "EC-N7b", desc: "§22 invalid --topology -> exit 2", bin: "cli", args
 test({ id: "EC-N7c", desc: "§22 invalid --mode -> exit 2", bin: "cli", args: ["q", "--local", "--mode", "turbo"],
   check: (r) => r.status === 2 && inc(r.stderr, "mode") });
 test({ id: "N8", desc: "§22 default (no v0.9 flags) is unchanged deliberation", bin: "harness", args: ["q", "--local", "--format", "json"],
-  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===3 && j.fusionix.route_category===undefined && j.fusionix.analysis!==undefined; } });
+  check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===3 && j.fusionix.route_category===undefined && j.fusionix.analysis!==undefined
+    // round-1 ("ans-") answers, not a debate round ("revised-"): catches topology defaulting on.
+    && j.fusionix.panel.every((p)=>p.answer.startsWith("ans-")); } });
 
 // ---------------------------------------------------------------------------
 // Execute

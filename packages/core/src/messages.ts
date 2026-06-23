@@ -37,6 +37,18 @@ export function hasUserMessage(messages: ChatMessage[]): boolean {
 }
 
 /**
+ * The user's question text only — system/persona and assistant turns excluded.
+ * Category detection (routing §22.4 and the capability writer-strategy §22.2) reads
+ * this, so fixed persona/system text cannot pin a query to the wrong category.
+ */
+export function userTurnsText(messages: ChatMessage[]): string {
+  return messages
+    .filter((m) => m.role === "user")
+    .map((m) => contentToString(m.content))
+    .join("\n");
+}
+
+/**
  * Render the user request for judge/writer (`{{prompt}}`):
  *  - single user turn, no system → the bare text;
  *  - otherwise → a compact rendering with system constraints + turns.

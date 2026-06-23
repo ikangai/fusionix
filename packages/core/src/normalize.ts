@@ -7,7 +7,7 @@
  * → validate.
  */
 import { FusionixError } from "./errors.ts";
-import { foldRoles, hasUserMessage, contentToString } from "./messages.ts";
+import { foldRoles, hasUserMessage, userTurnsText } from "./messages.ts";
 import { defaultRandomId } from "./util.ts";
 import { providerOf, detectCategory, pickBestModel } from "./capabilities.ts";
 import type {
@@ -132,11 +132,7 @@ export function normalizeRequest(
     }
     // Detect over the user's question only — not caller system/persona text, which is
     // usually fixed across turns and would otherwise pin every query to one category.
-    const userText = request.messages
-      .filter((m) => m.role === "user")
-      .map((m) => contentToString(m.content))
-      .join("\n");
-    const category = detectCategory(userText);
+    const category = detectCategory(userTurnsText(request.messages));
     const routed = pickBestModel(panel, category);
     if (routed) {
       writer = routed;

@@ -37,46 +37,51 @@ export async function runDebate(
   responses: PanelResponse[],
   deps: DebateDeps,
 ): Promise<DebateOutcome> {
-  const survivors = responses.filter((r) => r.error === undefined && r.answer !== undefined);
+  // Survivors paired with their position in `responses`, so revisions map back
+  // POSITIONALLY — a panel that legitimately repeats a model id keeps each entry's
+  // distinct revision instead of collapsing them under one map key.
+  const survivors: { r: PanelResponse; i: number }[] = [];
+  responses.forEach((r, i) => {
+    if (r.error === undefined && r.answer !== undefined) survivors.push({ r, i });
+  });
   // A debate needs at least two views to be worth a round.
   if (survivors.length < 2) return { responses, calls: [] };
 
   const systemText = composeSystem(DEBATE_SYSTEM, plan.panelSystem);
-  const answersBlock = renderAnswers(survivors);
+  const answersBlock = renderAnswers(survivors.map((s) => s.r));
   const signalOpts = deps.signal ? { signal: deps.signal } : {};
 
   const settled = await Promise.all(
-    survivors.map(async (s) => {
+    survivors.map(async ({ r, i }) => {
       const user =
         `User question:\n${prompt}\n\n` +
         `The panel's first answers:\n${answersBlock}\n\n` +
-        `You are ${s.model}. Revise your own answer in light of the others. Return the same JSON shape.`;
+        `You are ${r.model}. Revise your own answer in light of the others. Return the same JSON shape.`;
       // prependSystem folds caller roles, but here we send only the debate instruction
       // and a single user message (the question + peer answers), like the judge/writer.
-      const req = makeChatRequest(s.model, prependSystem(systemText, [{ role: "user", content: user }]), {
+      const req = makeChatRequest(r.model, prependSystem(systemText, [{ role: "user", content: user }]), {
         temperature: plan.panelTemperature,
         maxTokens: plan.panelMaxTokens,
       });
       try {
         const res = await deps.gateway.chat(req, signalOpts);
-        return { model: s.model, ok: true as const, res };
+        return { i, model: r.model, ok: true as const, res };
       } catch {
-        return { model: s.model, ok: false as const };
+        return { i, model: r.model, ok: false as const };
       }
     }),
   );
 
-  const revisedByModel = new Map<string, PanelResponse>();
+  const revised = responses.slice();
   const calls: GatewayCallResult[] = [];
   for (const outcome of settled) {
     if (!outcome.ok) continue; // revision failed → keep the round-1 answer
     calls.push(outcome.res);
     if (outcome.res.content && outcome.res.content.trim().length > 0) {
-      revisedByModel.set(outcome.model, parsePanelContent(outcome.model, outcome.res.content));
+      revised[outcome.i] = parsePanelContent(outcome.model, outcome.res.content);
     }
     // empty revision → keep round-1 (don't overwrite)
   }
 
-  const revised = responses.map((r) => revisedByModel.get(r.model) ?? r);
   return { responses: revised, calls };
 }
