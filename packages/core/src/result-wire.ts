@@ -46,6 +46,8 @@ export interface FusionixExtrasWire {
   route_category?: string;
   /** The model auto-selected by routing; present only for routed runs (v0.9 §22.4). */
   model_used?: string;
+  /** True when the writer was skipped on judge consensus (v0.10 §23.1); present only then. */
+  accepted_on_consensus?: boolean;
 }
 
 export interface ChatCompletionResponse {
@@ -101,6 +103,8 @@ export function toChatCompletion(result: FusionixRunResult): ChatCompletionRespo
     fusionix.route_category = result.routeCategory;
     fusionix.model_used = result.model;
   }
+  // Accept-gate runs (§23.1) flag that the writer was skipped on consensus.
+  if (result.acceptedOnConsensus) fusionix.accepted_on_consensus = true;
 
   return {
     id: result.runId,

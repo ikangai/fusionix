@@ -26,6 +26,8 @@ interface RawPreset {
   writerStrategy?: string;
   topology?: string;
   route?: boolean;
+  acceptOnConsensus?: boolean;
+  writerAccess?: string;
 }
 
 interface RawConfig {
@@ -67,6 +69,8 @@ function toPreset(key: string, raw: RawPreset): ResolvedPreset {
   if (raw.writerStrategy) preset.writerStrategy = raw.writerStrategy as ResolvedPreset["writerStrategy"];
   if (raw.topology) preset.topology = raw.topology as ResolvedPreset["topology"];
   if (raw.route !== undefined) preset.route = raw.route;
+  if (raw.acceptOnConsensus !== undefined) preset.acceptOnConsensus = raw.acceptOnConsensus;
+  if (raw.writerAccess) preset.writerAccess = raw.writerAccess as ResolvedPreset["writerAccess"];
   return preset;
 }
 

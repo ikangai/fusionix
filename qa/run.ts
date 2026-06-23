@@ -47,7 +47,7 @@ interface Scenario {
     usage?: { p: number; c: number; cost?: number };
   };
   debate?: { answerPrefix?: string; default?: Behavior; models?: Record<string, Behavior> }; // §22.5 revision round
-  judge?: { first?: Behavior; repair?: Behavior; ranking?: string[]; usage?: { p: number; c: number; cost?: number } };
+  judge?: { first?: Behavior; repair?: Behavior; ranking?: string[]; consensus?: boolean; usage?: { p: number; c: number; cost?: number } }; // consensus → empty contradictions/blind_spots (§23.1)
   writer?: Behavior & { stream?: boolean };
   prices?: Record<string, PriceEntry> | null; // null → loadPrices throws (unavailable)
   backfill?: Record<string, number>; // generation id → cost (enables getGeneration)
@@ -145,9 +145,11 @@ function makeFakeGateway(sc: Scenario): ChatGateway {
       const b = (stage === "repair" ? sc.judge?.repair : sc.judge?.first) ?? { mode: "json" };
       if (b.mode === "throw") throw new Error(b.message ?? "judge call failed");
       let content: string;
-      if (b.mode === "json")
-        content = JSON.stringify(sc.judge?.ranking ? { ...VALID_ANALYSIS, ranking: sc.judge.ranking } : VALID_ANALYSIS);
-      else if (b.mode === "text") content = "Here is my comparison in prose, not JSON. A is best.";
+      if (b.mode === "json") {
+        let obj: Record<string, unknown> = sc.judge?.ranking ? { ...VALID_ANALYSIS, ranking: sc.judge.ranking } : VALID_ANALYSIS;
+        if (sc.judge?.consensus) obj = { ...obj, contradictions: [], blind_spots: [] };
+        content = JSON.stringify(obj);
+      } else if (b.mode === "text") content = "Here is my comparison in prose, not JSON. A is best.";
       else if (b.mode === "empty") content = "";
       else content = b.content ?? "";
       return { content, usage: usageOf(judgeUsage), id: `gen-judge-${stage}` };

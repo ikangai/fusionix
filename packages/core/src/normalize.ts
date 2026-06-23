@@ -19,7 +19,8 @@ import type {
 } from "./types.ts";
 
 const WRITER_STRATEGIES = new Set(["fixed", "top-ranked", "capability"]);
-const TOPOLOGIES = new Set(["standard", "debate"]);
+const TOPOLOGIES = new Set(["standard", "debate", "chain"]);
+const WRITER_ACCESS = new Set(["judge", "judge+panel", "judge+top"]);
 
 /**
  * Apply provider include/exclude filters to a resolved panel (v0.9 §22.1). `only`
@@ -118,6 +119,11 @@ export function normalizeRequest(
   if (topology !== undefined && !TOPOLOGIES.has(topology)) {
     throw new FusionixError("invalid_request", `Unknown topology: ${topology}`);
   }
+  const writerAccess = plugin?.writer_access ?? preset?.writerAccess;
+  if (writerAccess !== undefined && !WRITER_ACCESS.has(writerAccess)) {
+    throw new FusionixError("invalid_request", `Unknown writer_access: ${writerAccess}`);
+  }
+  const acceptOnConsensus = plugin?.accept_on_consensus ?? preset?.acceptOnConsensus;
 
   // Single-model routing (§22.4): fusionix picks the best-fit model from the pool and
   // runs it as a single-model call (bypass mechanics). Resolved here so behavior stays
@@ -190,6 +196,10 @@ export function normalizeRequest(
   if (topology !== undefined && topology !== "standard") {
     plan.topology = topology as ExecutionPlan["topology"];
   }
+  if (writerAccess !== undefined && writerAccess !== "judge") {
+    plan.writerAccess = writerAccess as ExecutionPlan["writerAccess"];
+  }
+  if (acceptOnConsensus) plan.acceptOnConsensus = true;
   if (routeCategory !== undefined) plan.routeCategory = routeCategory;
 
   return plan;

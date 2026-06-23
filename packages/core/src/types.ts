@@ -43,8 +43,12 @@ export interface FusionixPlugin {
   writer_strategy?: string;
   /** Route to a single best-fit model instead of deliberating (v0.9 §22.4). */
   route?: boolean;
-  /** Panel coordination topology: "standard" (default) or "debate" (v0.9 §22.5). */
+  /** Panel coordination topology: "standard", "debate", or "chain" (v0.9 §22.5 / v0.10 §23.4). */
   topology?: string;
+  /** Accept the top panelist and skip the writer when the judge reports consensus (v0.10 §23.1). */
+  accept_on_consensus?: boolean;
+  /** What the writer sees: "judge" (default), "judge+panel", or "judge+top" (v0.10 §23.3). */
+  writer_access?: string;
 }
 
 export interface FusionixChatCompletionRequest {
@@ -77,10 +81,14 @@ export interface ResolvedPreset {
   writerSystem?: string;
   /** Writer-selection strategy for this preset (v0.9 §22.2). */
   writerStrategy?: "fixed" | "top-ranked" | "capability";
-  /** Panel coordination topology for this preset (v0.9 §22.5). */
-  topology?: "standard" | "debate";
+  /** Panel coordination topology for this preset (v0.9 §22.5 / v0.10 §23.4). */
+  topology?: "standard" | "debate" | "chain";
   /** When true, this preset routes to a single best-fit model (v0.9 §22.4). */
   route?: boolean;
+  /** Accept the top panelist on judge consensus, skipping the writer (v0.10 §23.1). */
+  acceptOnConsensus?: boolean;
+  /** What the writer sees (v0.10 §23.3). */
+  writerAccess?: "judge" | "judge+panel" | "judge+top";
 }
 
 export interface FusionixConfigDefaults {
@@ -128,8 +136,12 @@ export interface ExecutionPlan {
   presetName?: string;
   /** Writer-selection strategy (v0.9 §22.2); absent means the fixed `writer`. */
   writerStrategy?: "fixed" | "top-ranked" | "capability";
-  /** Panel coordination topology (v0.9 §22.5); absent means "standard". */
-  topology?: "standard" | "debate";
+  /** Panel coordination topology (v0.9 §22.5 / v0.10 §23.4); absent means "standard". */
+  topology?: "standard" | "debate" | "chain";
+  /** Accept the top panelist on judge consensus, skipping the writer (v0.10 §23.1). */
+  acceptOnConsensus?: boolean;
+  /** What the writer sees (v0.10 §23.3); absent means "judge" (analysis only). */
+  writerAccess?: "judge" | "judge+panel" | "judge+top";
   /** Detected query category when the request was routed to a single model (v0.9 §22.4); for logging. */
   routeCategory?: string;
   /** Caller messages, role-folded (developer→system) but otherwise preserved. */
@@ -209,7 +221,7 @@ export interface Usage {
 
 export type WebStatus = "used" | "off" | "unsupported";
 
-export type FusionixStage = "panel" | "debate" | "judge" | "writer";
+export type FusionixStage = "panel" | "debate" | "chain" | "judge" | "writer";
 
 export interface FusionixRunResult {
   runId: string;
@@ -233,4 +245,6 @@ export interface FusionixRunResult {
   created: number;
   /** Detected query category when the run was routed to a single model (v0.9 §22.4). */
   routeCategory?: string;
+  /** True when the writer was skipped because the judge reported consensus (v0.10 §23.1). */
+  acceptedOnConsensus?: boolean;
 }

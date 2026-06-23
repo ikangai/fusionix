@@ -14,7 +14,8 @@ export function footerLine(result: FusionixRunResult): string {
       : "single model";
   const cost = result.costUsd == null ? "n/a" : `$${result.costUsd.toFixed(4)}`;
   const dur = `${(result.durationMs / 1000).toFixed(1)}s`;
-  return `panel: ${panelStr} · writer: ${result.model} · web: ${result.web} · cost: ${cost} · ${dur} · ${result.runId}`;
+  const writerStr = result.acceptedOnConsensus ? `${result.model} (accepted on consensus)` : result.model;
+  return `panel: ${panelStr} · writer: ${writerStr} · web: ${result.web} · cost: ${cost} · ${dur} · ${result.runId}`;
 }
 
 function nonEmpty<T>(arr: T[] | undefined): arr is T[] {

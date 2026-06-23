@@ -19,6 +19,8 @@ export function buildRequest(args: ParsedCliArgs, prompt: string): BuiltRequest 
   if (args.excludeProviders) plugin.exclude_providers = args.excludeProviders;
   if (args.writerStrategy) plugin.writer_strategy = args.writerStrategy;
   if (args.topology) plugin.topology = args.topology;
+  if (args.writerAccess) plugin.writer_access = args.writerAccess;
+  if (args.acceptOnConsensus) plugin.accept_on_consensus = true;
   // `--mode fast` is sugar for routing to a single best-fit model (§22.3).
   if (args.route || args.mode === "fast") plugin.route = true;
 

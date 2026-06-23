@@ -101,3 +101,12 @@ test("v0.9: route defaults false; provider/strategy flags undefined when omitted
   assert.equal(a.topology, undefined);
   assert.equal(a.mode, undefined);
 });
+
+test("v0.10: parses --accept-on-consensus and --writer-access (§23)", () => {
+  const a = parseCliArgs(["q", "--accept-on-consensus", "--writer-access", "judge+panel"]);
+  assert.equal(a.acceptOnConsensus, true);
+  assert.equal(a.writerAccess, "judge+panel");
+  const d = parseCliArgs(["q"]);
+  assert.equal(d.acceptOnConsensus, false);
+  assert.equal(d.writerAccess, undefined);
+});

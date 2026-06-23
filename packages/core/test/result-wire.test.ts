@@ -95,3 +95,10 @@ test("routed runs surface route_category and model_used; non-routed do not (§22
   assert.ok(!("route_category" in plain.fusionix), "no route_category when not routed");
   assert.ok(!("model_used" in plain.fusionix), "no model_used when not routed");
 });
+
+test("accepted_on_consensus surfaces only when the writer was skipped (§23.1)", () => {
+  const accepted = toChatCompletion(baseResult({ acceptedOnConsensus: true }));
+  assert.equal(accepted.fusionix.accepted_on_consensus, true);
+  const normal = toChatCompletion(baseResult({}));
+  assert.ok(!("accepted_on_consensus" in normal.fusionix), "absent on a normal run");
+});

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveRankedModel, chooseWriter } from "../src/pipeline/aggregator.ts";
-import type { ExecutionPlan, FusionixAnalysis } from "../src/types.ts";
+import { resolveRankedModel, chooseWriter, acceptTopOnConsensus } from "../src/pipeline/aggregator.ts";
+import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../src/types.ts";
 
 const OPUS = "anthropic/claude-opus-4.8";
 const GPT = "openai/gpt-5.2";
@@ -79,4 +79,31 @@ test("chooseWriter 'capability' keeps plan.writer for a category-less ('general'
 
 test("chooseWriter returns plan.writer when there are no survivors", () => {
   assert.equal(chooseWriter(plan({ writerStrategy: "top-ranked" }), analysis([GEMINI]), []), GPT);
+});
+
+// ---- acceptTopOnConsensus (§23.1 verifier accept-gate) -------------------
+
+const survivor = (model: string, answer: string): PanelResponse => ({ model, answer });
+
+test("acceptTopOnConsensus returns the judge's #1 survivor on full consensus", () => {
+  const survivors = [survivor(OPUS, "a-opus"), survivor(GPT, "a-gpt")];
+  assert.equal(acceptTopOnConsensus(analysis([GPT, OPUS]), survivors)?.model, GPT);
+});
+
+test("acceptTopOnConsensus falls back to the first survivor when the ranking can't resolve", () => {
+  const survivors = [survivor(OPUS, "a"), survivor(GPT, "b")];
+  assert.equal(acceptTopOnConsensus(analysis([]), survivors)?.model, OPUS);
+  assert.equal(acceptTopOnConsensus(analysis(["nonsense"]), survivors)?.model, OPUS);
+});
+
+test("acceptTopOnConsensus does NOT fire when there are contradictions or blind spots", () => {
+  const survivors = [survivor(OPUS, "a")];
+  const withContra: FusionixAnalysis = { ...analysis([OPUS]), contradictions: [{ topic: "t", stances: [] }] };
+  assert.equal(acceptTopOnConsensus(withContra, survivors), undefined);
+  const withBlind: FusionixAnalysis = { ...analysis([OPUS]), blindSpots: ["a gap"] };
+  assert.equal(acceptTopOnConsensus(withBlind, survivors), undefined);
+});
+
+test("acceptTopOnConsensus returns undefined with no survivors", () => {
+  assert.equal(acceptTopOnConsensus(analysis([OPUS]), []), undefined);
 });

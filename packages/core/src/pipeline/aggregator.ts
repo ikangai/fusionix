@@ -17,7 +17,7 @@
  */
 import { pickBestModel, detectCategory } from "../capabilities.ts";
 import { userTurnsText } from "../messages.ts";
-import type { ExecutionPlan, FusionixAnalysis } from "../types.ts";
+import type { ExecutionPlan, FusionixAnalysis, PanelResponse } from "../types.ts";
 
 /**
  * Resolve one judge-ranking entry to a surviving panel model, or undefined.
@@ -74,4 +74,30 @@ export function chooseWriter(plan: ExecutionPlan, analysis: FusionixAnalysis, su
     default:
       return plan.writer;
   }
+}
+
+/**
+ * Verifier accept-gate (v0.10 §23.1; TRINITY §3.2). When the judge reports full
+ * consensus — no contradictions AND no blind spots — accept the strongest surviving
+ * panelist's answer directly and skip the writer synthesis, saving a model call.
+ * Returns the accepted panel response (the judge's #1 ranked survivor if its ranking
+ * resolves, else the first survivor), or undefined when the gate does not fire.
+ * `survivors` are the surviving panel responses (each with a defined `answer`).
+ */
+export function acceptTopOnConsensus(
+  analysis: FusionixAnalysis,
+  survivors: PanelResponse[],
+): PanelResponse | undefined {
+  if (survivors.length === 0) return undefined;
+  if (analysis.contradictions.length > 0 || analysis.blindSpots.length > 0) return undefined;
+
+  const models = survivors.map((s) => s.model);
+  for (const entry of analysis.ranking) {
+    const resolved = resolveRankedModel(entry, models);
+    if (resolved) {
+      const match = survivors.find((s) => s.model === resolved);
+      if (match) return match;
+    }
+  }
+  return survivors[0];
 }

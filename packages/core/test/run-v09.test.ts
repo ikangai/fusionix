@@ -145,3 +145,42 @@ test("topology 'standard' (default) runs no debate round", async () => {
   assert.deepEqual(r.panel?.map((p) => p.answer), [`ans-${OPUS}`, `ans-${GPT}`, `ans-${GEMINI}`]);
   assert.deepEqual(stages, ["panel", "judge", "writer"]);
 });
+
+test("accept-on-consensus skips the writer and returns the top panelist (§23.1)", async () => {
+  const stages: string[] = [];
+  const { gateway, calls } = gatewayWith([GPT, OPUS, GEMINI]); // judge agrees, ranks GPT first
+  const r = await runFusionix(fx({ accept_on_consensus: true }), {
+    config: config(),
+    gateway,
+    apiKey: "x",
+    onProgress: (s) => stages.push(s),
+  });
+  assert.equal(r.acceptedOnConsensus, true);
+  assert.equal(r.model, GPT, "accepted the judge's #1 panelist");
+  assert.equal(r.answer, `ans-${GPT}`, "answer is the panelist's, not a writer synthesis");
+  assert.ok(r.analysis, "analysis is still present");
+  assert.equal(calls.filter((c) => stageOf(c) === "writer").length, 0, "no writer call");
+  assert.deepEqual(stages, ["panel", "judge"], "writer stage never announced");
+});
+
+test("accept-on-consensus does NOT skip the writer when the judge reports a contradiction (§23.1)", async () => {
+  const calls: ChatRequest[] = [];
+  const withContradiction = JSON.stringify({
+    consensus: [], contradictions: [{ topic: "approach", stances: [] }],
+    partial_coverage: [], unique_insights: [], blind_spots: [], ranking: [GPT],
+  });
+  const gateway: ChatGateway = {
+    async chat(req) {
+      calls.push(req);
+      const u: GatewayCallResult["usage"] = { prompt_tokens: 5, completion_tokens: 5, total_tokens: 10, cost: 0.1 };
+      const stage = stageOf(req);
+      if (stage === "panel") return { content: JSON.stringify({ answer: `ans-${req.model}` }), usage: u };
+      if (stage === "judge") return { content: withContradiction, usage: u };
+      return { content: "FINAL", usage: u };
+    },
+  };
+  const r = await runFusionix(fx({ accept_on_consensus: true }), { config: config(), gateway, apiKey: "x" });
+  assert.notEqual(r.acceptedOnConsensus, true, "gate did not fire");
+  assert.equal(r.answer, "FINAL", "the writer ran");
+  assert.equal(calls.filter((c) => stageOf(c) === "writer").length, 1, "writer was called");
+});

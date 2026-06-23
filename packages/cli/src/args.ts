@@ -26,10 +26,14 @@ export interface ParsedCliArgs {
   writerStrategy?: string;
   /** v0.9 §22.4: route to a single best-fit model. */
   route: boolean;
-  /** v0.9 §22.5: "standard" | "debate". */
+  /** v0.9 §22.5 / v0.10 §23.4: "standard" | "debate" | "chain". */
   topology?: string;
   /** v0.9 §22.3: operating point — "fast" | "deliberate". */
   mode?: string;
+  /** v0.10 §23.1: accept the top panelist on judge consensus, skipping the writer. */
+  acceptOnConsensus: boolean;
+  /** v0.10 §23.3: what the writer sees — "judge" | "judge+panel" | "judge+top". */
+  writerAccess?: string;
   version: boolean;
   help: boolean;
 }
@@ -65,6 +69,8 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       route: { type: "boolean", default: false },
       topology: { type: "string" },
       mode: { type: "string" },
+      "accept-on-consensus": { type: "boolean", default: false },
+      "writer-access": { type: "string" },
       version: { type: "boolean", default: false },
       help: { type: "boolean", default: false },
     },
@@ -76,6 +82,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
     stream: Boolean(values.stream),
     showAnalysis: Boolean(values["show-analysis"]),
     route: Boolean(values.route),
+    acceptOnConsensus: Boolean(values["accept-on-consensus"]),
     version: Boolean(values.version),
     help: Boolean(values.help),
   };
@@ -107,6 +114,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
   if (values["writer-strategy"]) args.writerStrategy = values["writer-strategy"];
   if (values.topology) args.topology = values.topology;
   if (values.mode) args.mode = values.mode;
+  if (values["writer-access"]) args.writerAccess = values["writer-access"];
 
   return args;
 }
