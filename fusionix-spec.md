@@ -1,7 +1,7 @@
 # Fusionix — OpenRouter-Shaped Multi-Model Deliberation Engine
 
 **Implementation specification for Claude Code**
-Status: v0.8 — FROZEN (implement Phase 1 only)
+Status: v0.9 — Phase 1 + Fugu-inspired extensions (§22). (v0.8 was "FROZEN, Phase 1 only"; v0.9 adds opt-in, off-by-default deliberation controls inspired by the Sakana Fugu report and supersedes the corresponding §19 non-goals.)
 Owner: IKANGAI
 Product domain: fusionix.ikangai.com
 API base: https://fusionix.ikangai.com/api
@@ -32,7 +32,7 @@ user request
 2. **Judge** — compare the panel answers; return structured JSON: consensus, contradictions, partial coverage, unique insights, blind spots, optional ranking.
 3. **Writer** — produce the final user-facing answer from the original prompt and the judge analysis.
 
-This is the whole product. No debate rounds, no critic judge, no backend matrix for v1.
+This is the core product and the default behavior. v0.9 adds **opt-in, off-by-default** controls on top of this same pipeline — provider pool filtering, an adaptive (per-query) writer/aggregator, single-model routing, and an optional debate round — all specified in §22. With no v0.9 options set, behavior is exactly the pipeline above.
 
 ---
 
@@ -828,12 +828,12 @@ Done when it explains the product, sets latency expectations, uses the §6.4 lin
 
 Do not build these in v1:
 
-- debate rounds
+- ~~debate rounds~~ — **superseded in v0.9**: added as the opt-in `--topology debate` (§22.5).
 - critic judge
 - MCP server
-- complex capability/backend matrix
+- ~~complex capability/backend matrix~~ — v0.9 adds a *small, coarse, hand-maintained* capability prior (§22.6), not a full matrix.
 - offline rejudge
-- general single-model passthrough proxy (the endpoint is for deliberation; §6.8 returns `400 not_a_fusionix_request` otherwise)
+- ~~general single-model passthrough proxy~~ — still not a passthrough proxy, but v0.9 adds opt-in single-model **routing** that selects a model from the pool (§22.4); the `400 not_a_fusionix_request` rule for a concrete model with no plugin is unchanged (§6.8).
 - **counted / multi-step web-search/fetch tool loop** (v1 uses gateway-native web only; §15)
 - **full provider-independent cost engine** (the thin gateway-usage path in §8 *is* in scope)
 - **managed/margin billing and metering** (BYO gateway key is the v1 model; §7.2)
@@ -863,5 +863,49 @@ Start here:
 5. Panel order and partial-failure behavior (§6.3, §17).
 6. Judge JSON, one repair attempt (§14.2).
 7. Writer answer (§14.3).
+
+---
+
+## 22. Fugu-inspired extensions (v0.9)
+
+These extensions are inspired by the **Sakana Fugu technical report** (Sakana AI, 2026), which studies learned orchestration of frontier models and — while benchmarking against OpenRouter Fusion — identifies the limitations of a *fixed* deliberation pipeline. fusionix is a deterministic, zero-ML gateway pipeline, so it cannot learn an orchestrator; instead it adopts the report's *structural* ideas as small, deterministic, **opt-in** controls. See `docs/design/fugu-extensions.md` for the full mapping and rationale.
+
+**Invariants for every extension below:**
+- **Off by default.** With no v0.9 option set, behavior is exactly §1. (Regression-guarded: QA case `M8`.)
+- **Deterministic, resolved pre-call (§6.8).** All selection happens in normalization before any gateway call; nothing is decided from live model output except the adaptive writer, which is a pure function of the judge analysis.
+- **Resolvable from preset or request.** Each option may be set on a preset (§5.1) or per-request via the plugin / CLI flag.
+
+### 22.1 Provider pool filtering
+
+`plugins[0].only_providers` / `exclude_providers` (CLI `--only-provider` / `--exclude-provider`, CSV) filter the resolved panel by provider prefix (`anthropic`, `openai`, `google`, …). `only` keeps only those providers; `exclude` then drops providers; both are applied in normalization. Filtering the panel to empty is `400 invalid_request` with a distinct message. (Fugu §2–3: configurable agent pools that favor/exclude providers for compliance.)
+
+### 22.2 Adaptive aggregator (writer strategy)
+
+`plugins[0].writer_strategy` (CLI `--writer-strategy`): `fixed` (default — §14.3 unchanged) | `top-ranked` | `capability`. For a non-fixed strategy, the writer is chosen from the **surviving panel models** after the judge:
+- `top-ranked`: the judge's #1 ranked model. To make this reliable the judge prompt (§14.2) now instructs ranking by **model-id**, and `resolveRankedModel` maps a ranking entry (slug, `[n]` index, or family substring) back to a surviving model.
+- `capability`: the surviving panelist best-suited to the detected query category (§22.6).
+
+It always falls back to the configured writer when nothing resolves. `result.model` reports the model that actually wrote. The writer prompt (§14.3) is also strengthened to **resolve** disagreements, not merely report them. (Fugu §4.4: a fixed aggregator bottlenecks the system; Fugu-Ultra picks the aggregator per query.)
+
+### 22.3 Operating points (`--mode`)
+
+`--mode fast|deliberate`: `deliberate` is the default full pipeline; `fast` is sugar for routing to a single model (§22.4). Mirrors Fugu's two variants (latency-aware single-worker vs. multi-agent quality).
+
+### 22.4 Single-model routing
+
+`plugins[0].route` (CLI `--route`, or `--mode fast`): fusionix picks the single best-fit model from the pool via the capability prior (§22.6) and a deterministic keyword category detection over the **user turn**, then runs it through the single-model bypass path (§6.7). Routing applies only to the `fusionix` meta-model: an explicit concrete `model` or `enabled:false` bypass wins, so a named model is never silently swapped. Routed runs surface `route_category` + `model_used` in the JSON extras and the CLI footer. This is **not** a passthrough proxy (§6.8's `not_a_fusionix_request` rule is unchanged). (Fugu's latency-aware variant: route each query to the most capable single model.)
+
+### 22.5 Debate topology
+
+`plugins[0].topology` (CLI `--topology`): `standard` (default) | `debate`. `debate` inserts one inter-panel revision round between panel and judge — each surviving panelist sees the others' first answers and revises its own; the revised answers replace the round-1 answers for the judge and the result. Debate does not use web (§15) and can only improve or preserve the panel (a failed/empty revision keeps round-1). Surfaces a `debate` progress stage. (Fugu §4.4 "debate and aggregation".)
+
+### 22.6 Capability prior
+
+`packages/core/src/capabilities.ts` is a small, coarse, hand-maintained map of provider/family → strength tags, encoding the domain specializations the Fugu report observes (GPT→math, Gemini→science/recall, Opus→coding/debugging/cybersecurity). It is the one transferable idea from Fugu's training methodology (which fusionix cannot replicate without an ML loop) and powers §22.2 (`capability`) and §22.4. `detectCategory` is a deterministic, no-model keyword classifier. These are heuristics, not measurements, and model slugs drift — treat as product data, like the preset model lists (§4).
+
+### 22.7 Deferred / not applicable
+
+- **Access-list memory & intra-workflow isolation** (Fugu §3.2.2): meaningful only with tool-use / multi-turn function calling, which fusionix v0.9 does not have. Deferred; see the design note.
+- **Learned orchestration** (Fugu's SFT / sep-CMA-ES / GRPO): out of scope — fusionix is deterministic and zero-ML. The transferable crumb is the §22.6 capability prior.
 
 Everything else follows the phase plan (§18).

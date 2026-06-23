@@ -162,14 +162,31 @@ by `qa/drive.mjs` and the bug log.
 | M1 | `choices[0].message.content` | == final answer. |
 | M2 | `fusionix.panel[]` | resolved order; failed members `{model,error}`. |
 | M3 | `fusionix.analysis` | snake_case keys (partial_coverage, unique_insights, blind_spots). |
-| M4 | bypass extras (core only) | only `run_id`, `duration_ms`, `web` (no CLI flag exposes bypass). |
+| M4 | bypass extras (core only) | only `run_id`, `duration_ms`, `web` (no CLI flag exposes `enabled:false` bypass). |
+
+## N. v0.9 Fugu extensions (§22) — opt-in, off by default
+
+| ID | Feature | Acceptance criteria |
+|----|---------|---------------------|
+| N1 | `--only-provider a,b` (§22.1) | panel restricted to those providers. |
+| N2 | `--exclude-provider a` (§22.1) | named providers dropped from the panel. |
+| EC-N2a | filter empties the panel | `invalid_request`, nonzero exit. |
+| N3 | `--route` (§22.4) | single best-fit model; no panel; `route_category` + `model_used` in extras. |
+| N4 | `--mode fast` (§22.3) | sugar for routing. |
+| N5 | `--writer-strategy capability` (§22.2) | writer switches to the per-category specialist (footer reports it). |
+| N6 | `--topology debate` (§22.5) | one revision round; panel carries revised answers. |
+| EC-N7a/b/c | invalid `--writer-strategy` / `--topology` / `--mode` | exit 2 (usage error). |
+| N8 | no v0.9 flags | behavior == default deliberation (regression guard). |
+
+Standalone tool: `node qa/ab-eval.mjs` — deliberation-vs-best-panelist structural A/B (§22, offline).
 
 ---
 
 ## Notes on coverage boundaries
 
-- **Single-model bypass (§6.7)** is a core feature but **not reachable from the CLI** — no flag
-  sets `plugins[].enabled=false`. Tested at the core level only; flagged as a CLI gap (not a bug).
+- **Single-model bypass (§6.7)**: the explicit `enabled:false` bypass is still **not reachable
+  from the CLI**, so it is tested at the core level only. Its execution path *is* now exercised
+  end-to-end from the CLI via v0.9 routing (`--route`, group N), which reuses the bypass mechanics.
 - **Live network** (real OpenRouter calls) is intentionally NOT exercised in the automated matrix:
   it costs money and hits an external service. The harness (`qa/run.ts`) reproduces production-like
   model behavior offline. A live smoke run requires explicit operator approval.

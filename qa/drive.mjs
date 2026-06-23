@@ -223,28 +223,28 @@ test({ id: "L2", desc: "FUSIONIX_CONFIG missing path -> error nonzero", bin: "ha
 test({ id: "L3", desc: "FUSIONIX_DEFAULT_GATEWAY env override (no crash)", bin: "harness", env: { FUSIONIX_DEFAULT_GATEWAY: "https://gw.example/api/v1" }, args: ["q", "--local", "--preset", "general-budget", "--format", "json"],
   check: (r) => r.status === 0 });
 
-// ----- M. v0.9 Fugu extensions (§22) -----
-test({ id: "M1", desc: "§22.1 --only-provider filters the panel", bin: "harness", args: ["q", "--local", "--only-provider", "openai,google", "--format", "json"],
+// ----- N. v0.9 Fugu extensions (§22) -----
+test({ id: "N1", desc: "§22.1 --only-provider filters the panel", bin: "harness", args: ["q", "--local", "--only-provider", "openai,google", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===2 && j.fusionix.panel.every((p)=>/^(openai|google)\//.test(p.model)); } });
-test({ id: "M2", desc: "§22.1 --exclude-provider drops a provider", bin: "harness", args: ["q", "--local", "--exclude-provider", "anthropic", "--format", "json"],
+test({ id: "N2", desc: "§22.1 --exclude-provider drops a provider", bin: "harness", args: ["q", "--local", "--exclude-provider", "anthropic", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.every((p)=>!p.model.startsWith("anthropic/")); } });
-test({ id: "EC-M2a", desc: "§22.1 filtering that empties the panel -> error nonzero", bin: "harness", args: ["q", "--local", "--exclude-provider", "anthropic,openai,google"],
+test({ id: "EC-N2a", desc: "§22.1 filtering that empties the panel -> error nonzero", bin: "harness", args: ["q", "--local", "--exclude-provider", "anthropic,openai,google"],
   check: (r) => r.status !== 0 });
-test({ id: "M3", desc: "§22.4 --route runs a single best-fit model (math->openai)", bin: "harness", args: ["Prove the theorem about polynomial roots", "--local", "--route", "--format", "json"],
+test({ id: "N3", desc: "§22.4 --route runs a single best-fit model (math->openai)", bin: "harness", args: ["Prove the theorem about polynomial roots", "--local", "--route", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel===undefined && j.fusionix.route_category==="math" && j.fusionix.model_used==="openai/gpt-5.2"; } });
-test({ id: "M4", desc: "§22.3 --mode fast is sugar for routing", bin: "harness", args: ["Explain the chemistry of this enzyme reaction", "--local", "--mode", "fast", "--format", "json"],
+test({ id: "N4", desc: "§22.3 --mode fast is sugar for routing", bin: "harness", args: ["Explain the chemistry of this enzyme reaction", "--local", "--mode", "fast", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.route_category==="science" && j.fusionix.model_used==="google/gemini-3.1-pro-preview"; } });
-test({ id: "M5", desc: "§22.2 --writer-strategy capability switches the writer to the math specialist (research-high writer is Opus)", bin: "harness", args: ["Prove the theorem about polynomial roots", "--local", "--preset", "research-high", "--writer-strategy", "capability", "--format", "md"],
+test({ id: "N5", desc: "§22.2 --writer-strategy capability switches the writer to the math specialist (research-high writer is Opus)", bin: "harness", args: ["Prove the theorem about polynomial roots", "--local", "--preset", "research-high", "--writer-strategy", "capability", "--format", "md"],
   check: (r) => r.status === 0 && /writer: openai\/gpt-5\.2/.test(r.stdout) });
-test({ id: "M6", desc: "§22.5 --topology debate revises panel answers before judge", bin: "harness", args: ["q", "--local", "--topology", "debate", "--format", "json"],
+test({ id: "N6", desc: "§22.5 --topology debate revises panel answers before judge", bin: "harness", args: ["q", "--local", "--topology", "debate", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===3 && j.fusionix.panel.every((p)=>p.answer.startsWith("revised-")); } });
-test({ id: "EC-M7a", desc: "§22 invalid --writer-strategy -> exit 2", bin: "cli", args: ["q", "--local", "--writer-strategy", "bogus"],
+test({ id: "EC-N7a", desc: "§22 invalid --writer-strategy -> exit 2", bin: "cli", args: ["q", "--local", "--writer-strategy", "bogus"],
   check: (r) => r.status === 2 && inc(r.stderr, "writer-strategy") });
-test({ id: "EC-M7b", desc: "§22 invalid --topology -> exit 2", bin: "cli", args: ["q", "--local", "--topology", "tree"],
+test({ id: "EC-N7b", desc: "§22 invalid --topology -> exit 2", bin: "cli", args: ["q", "--local", "--topology", "tree"],
   check: (r) => r.status === 2 && inc(r.stderr, "topology") });
-test({ id: "EC-M7c", desc: "§22 invalid --mode -> exit 2", bin: "cli", args: ["q", "--local", "--mode", "turbo"],
+test({ id: "EC-N7c", desc: "§22 invalid --mode -> exit 2", bin: "cli", args: ["q", "--local", "--mode", "turbo"],
   check: (r) => r.status === 2 && inc(r.stderr, "mode") });
-test({ id: "M8", desc: "§22 default (no v0.9 flags) is unchanged deliberation", bin: "harness", args: ["q", "--local", "--format", "json"],
+test({ id: "N8", desc: "§22 default (no v0.9 flags) is unchanged deliberation", bin: "harness", args: ["q", "--local", "--format", "json"],
   check: (r) => { const j = JSON.parse(r.stdout); return r.status===0 && j.fusionix.panel.length===3 && j.fusionix.route_category===undefined && j.fusionix.analysis!==undefined; } });
 
 // ---------------------------------------------------------------------------

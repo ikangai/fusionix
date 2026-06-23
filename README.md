@@ -74,6 +74,23 @@ Key options (`fusionix --help` for the full list):
 | `--log <path>` | Write a JSON run record. |
 | `--max-cost <usd>` | Warn/abort before the run when the estimate exceeds this (best-effort). |
 
+### Deliberation controls (v0.9, opt-in)
+
+Inspired by the Sakana Fugu report; all **off by default** (see `fusionix-spec.md` §22 and `docs/design/fugu-extensions.md`):
+
+| Option | Meaning |
+|---|---|
+| `--only-provider <a,b>` / `--exclude-provider <a>` | Filter the panel by provider (`anthropic`, `openai`, `google`, …). |
+| `--writer-strategy <fixed\|top-ranked\|capability>` | Pick the writer per query — the judge's #1 model, or the per-category specialist — instead of always the configured writer. |
+| `--route` / `--mode fast` | Skip deliberation: route the query to a single best-fit model. |
+| `--topology <standard\|debate>` | `debate` adds one round where panelists revise after seeing each other's answers. |
+
+```bash
+fusionix "Prove this number-theory lemma" --local --writer-strategy capability   # GPT writes
+fusionix "What's the capital of Australia?" --local --route                       # one model, no panel
+fusionix "Design a rate limiter" --local --topology debate --show-analysis        # panelists revise, then judge
+```
+
 ### Latency
 
 Three sequential stages over large models commonly take **30–90 seconds**, and the panel and judge complete before any answer token appears — expect a quiet window (the CLI prints stage progress to stderr on a TTY, and `--stream` shows the answer as it is written).
