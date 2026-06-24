@@ -134,6 +134,8 @@ The same core powers the CLI, the SDK, and the hosted API, so all surfaces behav
 
 `--local` runs are paid by your own gateway key. A 3-model panel plus a judge and a writer is roughly 4–5× a single completion. Each run reports `cost_usd` from gateway-reported usage (e.g. `$0.01` on `general-budget`, ~`$0.10` on `general-high` with web).
 
+Web grounding can dominate the bill: it injects fetched page content into every panel member's context, which the judge and writer then re-process. A `research-high` query with web on a substantial prompt has been measured at **~$1–2** (hundreds of thousands of prompt tokens). Use `--max-cost` to cap a run, `--no-web` to cut the web context, or a `*-budget` preset for cheaper models.
+
 ---
 
 Built by [IKANGAI](https://ikangai.com). See `fusionix-spec.md` for the full specification.
