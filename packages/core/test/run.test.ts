@@ -208,7 +208,13 @@ test("deadline during panel: ≥1 survivor avoids all_panel_failed, but judge fa
   await assert.rejects(
     () =>
       runFusionix(userReq, { config: makeConfig(["FAST", "SLOW"]), gateway, apiKey: "x", maxRequestDurationMs: 30 }),
-    (err: unknown) => isFusionixError(err) && err.code === "judge_failed",
+    (err: unknown) =>
+      isFusionixError(err) &&
+      err.code === "judge_failed" &&
+      // §17 keeps the code, but the message must name the deadline and how to raise it —
+      // not a cryptic "Judge call failed." / "non-JSON response".
+      /deadline/i.test(err.message) &&
+      /max-duration/i.test(err.message),
   );
 });
 
