@@ -18,6 +18,8 @@ export interface ParsedCliArgs {
   showAnalysis: boolean;
   log?: string;
   maxCost?: number;
+  /** §17: override the hard request deadline, in seconds. Maps to maxRequestDurationMs. */
+  maxDuration?: number;
   /** v0.9 §22.1: restrict the panel to these providers. */
   onlyProviders?: string[];
   /** v0.9 §22.1: drop these providers from the panel. */
@@ -63,6 +65,7 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       "show-analysis": { type: "boolean", default: false },
       log: { type: "string" },
       "max-cost": { type: "string" },
+      "max-duration": { type: "string" },
       "only-provider": { type: "string" },
       "exclude-provider": { type: "string" },
       "writer-strategy": { type: "string" },
@@ -108,6 +111,13 @@ export function parseCliArgs(argv: string[]): ParsedCliArgs {
       throw new Error(`invalid --max-cost '${values["max-cost"]}' (expected a positive number)`);
     }
     args.maxCost = n;
+  }
+  if (values["max-duration"] !== undefined) {
+    const n = Number(values["max-duration"]);
+    if (!Number.isFinite(n) || n <= 0) {
+      throw new Error(`invalid --max-duration '${values["max-duration"]}' (expected a positive number of seconds)`);
+    }
+    args.maxDuration = n;
   }
   if (values["only-provider"]) args.onlyProviders = splitCsv(values["only-provider"]);
   if (values["exclude-provider"]) args.excludeProviders = splitCsv(values["exclude-provider"]);
