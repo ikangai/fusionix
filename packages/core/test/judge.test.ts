@@ -63,6 +63,31 @@ test("parses valid judge JSON (snake_case → camelCase) in one call", async () 
   assert.equal(out.length, 1);
 });
 
+test("captures content when the judge elaborates each field as objects (gpt-5.2 schema)", async () => {
+  // Real shape observed from openai/gpt-5.2 as judge: every field is an array of richly
+  // keyed objects, not the bare strings / {model,stance} the prompt's empty skeleton
+  // implies. coerceAnalysis must extract the text, not silently drop it (the empty-analysis
+  // bug). The simple schema (other tests) must keep working unchanged.
+  const RICH = JSON.stringify({
+    consensus: [{ point: "Loops span multiple timescales", answers: ["1", "2"], evidence_quality: "moderate" }],
+    blind_spots: [{ answer: "2", issue: "No citations provided", examples: ["x"] }],
+    ranking: [{ rank: 1, answer: "[2]", why: "strongest evidence" }],
+    partial_coverage: [{ area: "multi-region quotas", coverage: "only briefly mentioned" }],
+    unique_insights: [{ answer: "1", insight: "RLVR closes the loop", citation_status: "uncited" }],
+    contradictions: [{ topic: "does self-correction help", claim_1: "yes", claim_2: "no", notes: "n" }],
+  });
+  const { gateway, calls } = sequencedGateway([() => ({ content: RICH })]);
+  const { analysis } = await runJudge(makePlan(), "q", panel, { gateway });
+  assert.deepEqual(analysis.consensus, ["Loops span multiple timescales"]);
+  assert.deepEqual(analysis.blindSpots, ["No citations provided"]);
+  assert.deepEqual(analysis.ranking, ["strongest evidence"]);
+  assert.equal(analysis.partialCoverage.length, 1);
+  assert.match(analysis.partialCoverage[0]!.point, /multi-region|briefly/);
+  assert.equal(analysis.uniqueInsights[0]!.insight, "RLVR closes the loop");
+  assert.equal(analysis.contradictions[0]!.topic, "does self-correction help");
+  assert.equal(calls.length, 1, "structured-but-valid JSON needs no repair");
+});
+
 test("coerces missing keys to empty arrays without repair", async () => {
   const { gateway, calls } = sequencedGateway([() => ({ content: '{"consensus":["only"]}' })]);
   const { analysis } = await runJudge(makePlan(), "q", panel, { gateway });

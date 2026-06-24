@@ -41,12 +41,37 @@ function extractObject(content: string): Record<string, unknown> | undefined {
   return undefined;
 }
 
-function strArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
-}
-
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+// The judge prompt only shows an empty skeleton ({ "consensus": [], ... }), so a model is
+// free to fill each array with bare strings OR richly-keyed objects (gpt-5.2, for one,
+// returns e.g. consensus: [{ point, answers, evidence_quality }]). Pull a representative
+// string out of either form so structured content is never silently dropped.
+const TEXT_KEYS = ["point", "insight", "issue", "statement", "claim", "summary", "description", "why", "text"];
+
+function toText(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    const t = value.trim();
+    return t.length > 0 ? t : undefined;
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    for (const key of TEXT_KEYS) {
+      const v = obj[key];
+      if (typeof v === "string" && v.trim().length > 0) return v.trim();
+    }
+    // No known text key — join every string-valued field so nothing is lost.
+    const parts = Object.values(obj).filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+    if (parts.length > 0) return parts.join(" — ");
+  }
+  return undefined;
+}
+
+function strArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(toText).filter((s): s is string => s !== undefined);
 }
 
 function coerceContradictions(value: unknown): Contradiction[] {
@@ -60,7 +85,7 @@ function coerceContradictions(value: unknown): Contradiction[] {
           .filter((s): s is { model?: unknown; stance?: unknown } => !!s && typeof s === "object")
           .map((s) => ({ model: str(s.model), stance: str(s.stance) }))
       : [];
-    out.push({ topic: str(it.topic), stances });
+    out.push({ topic: str(it.topic) || toText(item) || "", stances });
   }
   return out;
 }
@@ -68,15 +93,15 @@ function coerceContradictions(value: unknown): Contradiction[] {
 function coercePartialCoverage(value: unknown): PartialCoverage[] {
   if (!Array.isArray(value)) return [];
   return value
-    .filter((it): it is { models?: unknown; point?: unknown } => !!it && typeof it === "object")
-    .map((it) => ({ models: strArray(it.models), point: str(it.point) }));
+    .filter((it): it is Record<string, unknown> => !!it && typeof it === "object")
+    .map((it) => ({ models: strArray(it.models), point: str(it.point) || toText(it) || "" }));
 }
 
 function coerceUniqueInsights(value: unknown): UniqueInsight[] {
   if (!Array.isArray(value)) return [];
   return value
-    .filter((it): it is { model?: unknown; insight?: unknown } => !!it && typeof it === "object")
-    .map((it) => ({ model: str(it.model), insight: str(it.insight) }));
+    .filter((it): it is Record<string, unknown> => !!it && typeof it === "object")
+    .map((it) => ({ model: str(it.model), insight: str(it.insight) || toText(it) || "" }));
 }
 
 /** Map a parsed object (snake_case or camelCase) into the canonical analysis with all 6 arrays. */
