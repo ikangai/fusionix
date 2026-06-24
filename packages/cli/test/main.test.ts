@@ -110,6 +110,20 @@ test("happy path (md on TTY): prints the answer and calls runFusionix with the r
   assert.equal(h.calls[0]!.opts.apiKey, "k");
 });
 
+test("--max-duration <seconds> passes maxRequestDurationMs (ms) to runFusionix (§17)", async () => {
+  const h = harness();
+  const code = await main(["q", "--local", "--max-duration", "600"], h.deps);
+  assert.equal(code, 0);
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0]!.opts.maxRequestDurationMs, 600000);
+});
+
+test("no --max-duration leaves maxRequestDurationMs unset (core default applies)", async () => {
+  const h = harness();
+  await main(["q", "--local"], h.deps);
+  assert.equal(h.calls[0]!.opts.maxRequestDurationMs, undefined);
+});
+
 test("json by default when output is piped (not a TTY)", async () => {
   const h = harness({ isTTY: false });
   const code = await main(["q", "--local"], h.deps);

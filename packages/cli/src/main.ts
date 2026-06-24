@@ -48,6 +48,8 @@ Options:
   --show-analysis         Include judge analysis in md/text output
   --log <path>            Append a JSON run record (JSONL; one line per run)
   --max-cost <usd>        Warn/abort before run when the estimate exceeds this
+  --max-duration <sec>    Hard request deadline in seconds (default 600; raise for
+                          heavy research-high + web runs)
 
 v0.9 extensions (Fugu-inspired; §22):
   --only-provider <a,b>   Restrict the panel to these providers
@@ -239,6 +241,8 @@ export async function main(argv: string[], deps: MainDeps = {}): Promise<number>
   // Reuse the config already loaded for the estimate so the run doesn't re-read it (no double load / TOCTOU).
   if (preloadedConfig) runOpts.config = preloadedConfig;
   if (webOverride !== undefined) runOpts.webOverride = webOverride;
+  // §17: --max-duration is in seconds; the core deadline is in ms.
+  if (args.maxDuration !== undefined) runOpts.maxRequestDurationMs = args.maxDuration * 1000;
   if (env.FUSIONIX_HTTP_REFERER) runOpts.referer = env.FUSIONIX_HTTP_REFERER;
   if (env.FUSIONIX_APP_TITLE) runOpts.title = env.FUSIONIX_APP_TITLE;
   if (isTTY) runOpts.onProgress = (stage) => stderr(`[fusionix] ${stage}…\n`);

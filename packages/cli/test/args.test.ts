@@ -26,6 +26,20 @@ test("parses numeric flags", () => {
   assert.equal(a.maxCost, 1.5);
 });
 
+test("parses --max-duration (seconds) into maxDuration; undefined when omitted", () => {
+  assert.equal(parseCliArgs(["q", "--max-duration", "600"]).maxDuration, 600);
+  assert.equal(parseCliArgs(["q"]).maxDuration, undefined);
+});
+
+test("rejects a non-numeric --max-duration instead of silently ignoring it", () => {
+  assert.throws(() => parseCliArgs(["q", "--max-duration", "5m"]), /max-duration/);
+});
+
+test("rejects a negative or zero --max-duration", () => {
+  assert.throws(() => parseCliArgs(["q", "--max-duration", "-1"]), /max-duration/);
+  assert.throws(() => parseCliArgs(["q", "--max-duration", "0"]), /max-duration/);
+});
+
 test("parses boolean flags and string flags", () => {
   const a = parseCliArgs([
     "q",
