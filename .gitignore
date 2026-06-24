@@ -12,7 +12,7 @@ dist/
 
 # Local runtime / coordination state
 .groupchat/
-.dev-diary/.events.jsonl
+.dev-diary/
 
 # Logs
 *.log
