@@ -8,7 +8,7 @@
  * from judge_failed (§17).
  */
 import { finalizeCost } from "../cost.ts";
-import { FusionixError } from "../errors.ts";
+import { FusionixError, isFusionixError } from "../errors.ts";
 import { loadConfig } from "../config.ts";
 import { renderCompactPrompt } from "../messages.ts";
 import { normalizeRequest } from "../normalize.ts";
@@ -31,7 +31,13 @@ import type {
   GatewayCallResult,
 } from "../types.ts";
 
-const DEFAULT_MAX_REQUEST_DURATION_MS = 180_000;
+// The hard request deadline must accommodate the heaviest shipped preset. A
+// research-high + web run (three frontier reasoning models in the panel, then a
+// reasoning judge over the web-grounded answers, then the writer) was measured at
+// ~5 minutes end-to-end, with the panel stage alone past 180s — so the previous
+// 180s default aborted the judge mid-flight on every such run. Callers (and the
+// CLI's --max-duration) override via RunFusionixOptions.maxRequestDurationMs.
+const DEFAULT_MAX_REQUEST_DURATION_MS = 600_000;
 
 export interface RunFusionixOptions {
   /** Pre-loaded config; if omitted, loadConfig() runs (reads bundled default + overrides). */
@@ -92,12 +98,18 @@ export async function runFusionix(
   // Shared request deadline.
   const maxMs = opts.maxRequestDurationMs ?? DEFAULT_MAX_REQUEST_DURATION_MS;
   const controller = new AbortController();
+  // Distinguish a deadline overrun from a caller abort so the terminal error can
+  // explain itself (§17) instead of surfacing the raw "aborted"/"non-JSON" cause.
+  let deadlineHit = false;
   const onCallerAbort = () => controller.abort();
   if (opts.signal) {
     if (opts.signal.aborted) controller.abort();
     else opts.signal.addEventListener("abort", onCallerAbort, { once: true });
   }
-  const timer = setTimeout(() => controller.abort(), maxMs);
+  const timer = setTimeout(() => {
+    deadlineHit = true;
+    controller.abort();
+  }, maxMs);
   if (typeof timer.unref === "function") timer.unref();
 
   const deps = { gateway, signal: controller.signal };
@@ -196,6 +208,28 @@ export async function runFusionix(
     if (modelSelected) result.modelSelected = true;
     if (finishReason) result.finishReason = finishReason;
     return result;
+  } catch (err) {
+    // A deadline overrun surfaces from whichever stage was in flight, as that
+    // stage's terminal code (§17): all_panel_failed when no panel survivor,
+    // otherwise judge_failed / writer_failed once the shared signal is aborted.
+    // Keep the code (the §17 contract) but replace the cryptic underlying cause
+    // ("aborted" / "non-JSON response") with a message that names the deadline and
+    // how to raise it.
+    if (
+      deadlineHit &&
+      isFusionixError(err) &&
+      (err.code === "all_panel_failed" || err.code === "judge_failed" || err.code === "writer_failed")
+    ) {
+      const stage =
+        err.code === "all_panel_failed" ? "panel" : err.code === "judge_failed" ? "judge" : "writer";
+      throw new FusionixError(
+        err.code,
+        `Request deadline of ${maxMs}ms exceeded during the ${stage} stage. ` +
+          `Raise it with --max-duration <seconds> (CLI) or maxRequestDurationMs (SDK/core).`,
+        { runId: plan.runId, cause: err },
+      );
+    }
+    throw err;
   } finally {
     clearTimeout(timer);
     if (opts.signal) opts.signal.removeEventListener("abort", onCallerAbort);
