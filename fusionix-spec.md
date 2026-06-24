@@ -412,7 +412,7 @@ Recommended v1 defaults:
 {
   maxPanelSize: 8,
   maxPromptChars: 60000,
-  maxRequestDurationMs: 180000,
+  maxRequestDurationMs: 600000,
   maxConcurrentRequests: 4
 }
 ```
@@ -803,6 +803,9 @@ fusionix "question" --local --log run.jsonl
 - Abort outstanding gateway calls where possible.
 - If the panel has at least one successful answer at the deadline, proceed to judge with the survivors; if it has zero, return `502 all_panel_failed`.
 - If the judge or writer times out, return the corresponding 502 (`judge_failed` / `writer_failed`).
+- The terminal error keeps the §17 code but its **message** must name the deadline and how to raise it, rather than surfacing the raw abort/`non-JSON response` cause.
+
+The default `maxRequestDurationMs` (600000) accommodates the heaviest shipped preset: a `research-high` + web run uses three frontier reasoning models in the panel and a reasoning judge over the web-grounded answers, measured at ~5 minutes end-to-end. Callers override per request via `maxRequestDurationMs`; the local CLI exposes this as `--max-duration <seconds>`.
 
 Hosted responses use the §6.6 error object.
 

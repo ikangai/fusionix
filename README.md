@@ -73,6 +73,7 @@ Key options (`fusionix --help` for the full list):
 | `--stream` | Stream the final answer token-by-token. |
 | `--log <path>` | Write a JSON run record. |
 | `--max-cost <usd>` | Warn/abort before the run when the estimate exceeds this (best-effort). |
+| `--max-duration <sec>` | Hard request deadline in seconds (default 600). Raise it for heavy `research-high` + web runs. |
 
 ### Deliberation controls (v0.9 / v0.10, opt-in)
 
@@ -97,7 +98,7 @@ fusionix "Define idempotency" --local --accept-on-consensus                     
 
 ### Latency
 
-Three sequential stages over large models commonly take **30–90 seconds**, and the panel and judge complete before any answer token appears — expect a quiet window (the CLI prints stage progress to stderr on a TTY, and `--stream` shows the answer as it is written).
+Three sequential stages over large models commonly take **30–90 seconds**, and the panel and judge complete before any answer token appears — expect a quiet window (the CLI prints stage progress to stderr on a TTY, and `--stream` shows the answer as it is written). Heavy runs are slower: a `research-high` panel with web grounding can take **several minutes** (the web-grounded panel alone can run past 3 minutes). The hard request deadline defaults to **600 s**; raise it with `--max-duration <seconds>` if a run aborts with a deadline message.
 
 ## Presets
 
